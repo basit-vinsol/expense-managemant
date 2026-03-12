@@ -1,0 +1,147 @@
+/* PrintReport Component - Premium Console V14 Integration */
+.print-report-v14 {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.print-grid-v14 {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.print-section-v14 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.print-label-v14 {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 4px;
+}
+
+.print-row-v14 {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.print-input-v14 {
+  flex: 1;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: #f1f5f9;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.3s;
+}
+
+.print-input-v14:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.print-to-v14 {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.print-btn-v14 {
+  height: 44px;
+  padding: 0 12px; /* Reduced padding */
+  border-radius: 12px;
+  font-size: 0.7rem; /* Smaller font size */
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px; /* Reduced gap */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  white-space: nowrap;
+  text-transform: uppercase; /* Professional look */
+}
+
+.print-btn-v14.primary {
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.print-btn-v14.accent {
+  background: #8b5cf6;
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.print-btn-v14.success {
+  background: #10b981;
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.print-btn-v14.outline {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.print-btn-v14:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.print-btn-v14:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.print-actions-v14 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+/* Vertical Stacking for Console V15 */
+.print-stack-v15 {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.range-inputs-v15 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-inputs-v15 .print-input-v14 {
+  width: 100%; /* Split space between two inputs */
+}
+
+.full-width-v15 {
+  width: 100%;
+}
+
+/* Specific Sidebar Optimization */
+.print-btn-v14 {
+  height: 44px;
+  min-width: 110px; /* Base width for row buttons */
+}

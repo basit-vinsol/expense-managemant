@@ -1,0 +1,140 @@
+.monthly-overview {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+}
+
+.monthly-overview h3 {
+  color: var(--primary);
+  margin-bottom: 25px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  padding: 0;
+  border: none;
+}
+
+/* MonthlyOverview Component - Premium V5 */
+.overview-card-v5 {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.analytics-section-v5 {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analytics-section-v5 h4 {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analytics-grid-v5 {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analytics-item-v5 {
+  display: grid;
+  grid-template-columns: 120px 1fr 120px;
+  align-items: center;
+  gap: 20px;
+}
+
+.item-label-v5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.item-bar-v5 {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 100px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.bar-fill-v5 {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.item-value-v5 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: right;
+  font-family: 'Inter', monospace;
+}
+
+@media (max-width: 600px) {
+  .analytics-item-v5 { grid-template-columns: 1fr 100px; gap: 10px; }
+  .item-bar-v5 { grid-column: 1 / span 2; }
+}
+
+.month-total, .category-total {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.total-amount {
+  color: #2c3e50;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.no-data {
+  text-align: center;
+  color: #95a5a6;
+  padding: 20px;
+}
+
+@media screen and (max-width: 968px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .month-item, .category-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .month-name, .category-name {
+    flex: auto;
+  }
+
+  .month-amount, .category-amount {
+    flex: auto;
+    text-align: left;
+  }
+
+  .month-bar, .category-bar {
+    width: 100%;
+  }
+}

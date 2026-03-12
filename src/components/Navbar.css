@@ -1,0 +1,496 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  padding-top: 80px;
+}
+
+/* Navbar Base Styles */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: #3173b4;  /* Your specified color */
+  padding: 1rem 2rem;
+  z-index: 1000;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 20px rgba(49, 115, 180, 0.3); /* Updated shadow with your color */
+}
+
+.navbar-scrolled {
+  padding: 0.5rem 2rem;
+  background: rgba(49, 115, 180, 0.95); /* Your color with opacity */
+  backdrop-filter: blur(10px);
+  box-shadow: 0 5px 30px rgba(49, 115, 180, 0.2);
+}
+
+.navbar-scrolled .logo-main,
+.navbar-scrolled .logo-sub {
+  color: white; /* Keep text white on scrolled state */
+}
+
+.navbar-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Logo Styles */
+.navbar-logo {
+  flex: 0 0 auto;
+}
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-image {
+  height: 50px;
+  width: auto;
+  transition: all 0.3s ease;
+  animation: float 3s ease-in-out infinite;
+  filter: brightness(0) invert(1); /* Makes logo white to match theme */
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.navbar-scrolled .logo-image {
+  height: 40px;
+  filter: brightness(0) invert(1); /* Keep white even when scrolled */
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.logo-main {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  line-height: 1.2;
+  transition: color 0.3s ease;
+}
+
+.logo-sub {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 1px;
+  transition: color 0.3s ease;
+}
+
+.navbar-scrolled .logo-sub {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Navigation Links */
+.navbar-links {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-link {
+  position: relative;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: white;
+  padding: 0.5rem 0;
+  transition: color 0.3s ease;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.navbar-scrolled .nav-link {
+  color: white;
+}
+
+.link-text {
+  position: relative;
+  z-index: 1;
+}
+
+.link-hover-effect {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #ffd700, #ffffff); /* Gold to white gradient */
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-link:hover .link-hover-effect,
+.nav-link.hovered .link-hover-effect {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.nav-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  transform: scale(0);
+  transition: transform 0.3s ease;
+  z-index: 0;
+}
+
+.nav-link:hover::before {
+  transform: scale(1);
+}
+
+/* Mobile Toggle Button */
+.navbar-mobile-toggle {
+  display: none;
+  flex-direction: column;
+  cursor: pointer;
+  padding: 5px;
+  z-index: 1001;
+  transition: all 0.3s ease;
+}
+
+.bar {
+  width: 25px;
+  height: 3px;
+  background-color: white;
+  margin: 3px 0;
+  transition: all 0.3s ease;
+  border-radius: 3px;
+}
+
+.navbar-scrolled .bar {
+  background-color: white;
+}
+
+/* Mobile Toggle Animation */
+.navbar-mobile-toggle.active .bar:nth-child(1) {
+  transform: rotate(-45deg) translate(-5px, 6px);
+}
+
+.navbar-mobile-toggle.active .bar:nth-child(2) {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.navbar-mobile-toggle.active .bar:nth-child(3) {
+  transform: rotate(45deg) translate(-5px, -6px);
+}
+
+/* Mobile Menu Overlay */
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(49, 115, 180, 0.3); /* Your color with opacity */
+  backdrop-filter: blur(3px);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Hover Animations */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(49, 115, 180, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(49, 115, 180, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(49, 115, 180, 0);
+  }
+}
+
+.nav-item:first-child .nav-link:hover {
+  animation: pulse 1s infinite;
+}
+
+/* ========== RESPONSIVE DESIGN ========== */
+/* Tablet and Mobile View */
+@media screen and (max-width: 968px) {
+  .logo-main {
+    font-size: 1.2rem;
+  }
+  
+  .logo-sub {
+    font-size: 0.7rem;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .navbar {
+    padding: 0.8rem 1rem;
+    background: #3173b4; /* Your color */
+  }
+
+  .navbar-container {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Logo styling for mobile */
+  .navbar-logo {
+    flex: 1;
+  }
+
+  .logo-wrapper {
+    gap: 0.5rem;
+  }
+
+  .logo-image {
+    height: 40px;
+    filter: brightness(0) invert(1);
+  }
+
+  /* Text always visible on mobile */
+  .logo-text {
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  .logo-main {
+    font-size: 1rem;
+    color: white;
+    white-space: nowrap;
+  }
+
+  .logo-sub {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+  }
+
+  /* Mobile Toggle Button */
+  .navbar-mobile-toggle {
+    display: flex;
+    margin-left: 10px;
+  }
+
+  /* Mobile Menu Styles */
+  .navbar-links {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 280px;
+    height: 100vh;
+    background: #3173b4; /* Your color */
+    padding: 80px 2rem 2rem;
+    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -5px 0 30px rgba(49, 115, 180, 0.3);
+    z-index: 1000;
+    display: block;
+  }
+
+  .navbar-links.active {
+    right: 0;
+  }
+
+  .navbar-scrolled .navbar-links {
+    background: #3173b4; /* Your color - keep solid on mobile */
+  }
+
+  .nav-menu {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+
+  .nav-item {
+    width: 100%;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.3s ease;
+    transition-delay: calc(0.1s * var(--i, 0));
+  }
+
+  .navbar-links.active .nav-item {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .nav-item:nth-child(1) { --i: 1; }
+  .nav-item:nth-child(2) { --i: 2; }
+
+  .nav-link {
+    color: white;
+    font-size: 1.1rem;
+    display: block;
+    width: 100%;
+    padding: 0.6rem 0;
+  }
+
+  .nav-link::before {
+    display: none;
+  }
+
+  .link-hover-effect {
+    background: linear-gradient(90deg, #ffd700, #ffffff);
+    height: 3px;
+  }
+}
+
+/* Small mobile devices */
+@media screen and (max-width: 480px) {
+  .navbar {
+    padding: 0.6rem 0.8rem;
+    background: #3173b4;
+  }
+
+  .logo-image {
+    height: 35px;
+  }
+
+  .logo-main {
+    font-size: 0.9rem;
+  }
+
+  .logo-sub {
+    font-size: 0.5rem;
+  }
+
+  .navbar-links {
+    width: 250px;
+    padding: 70px 1.5rem 2rem;
+    background: #3173b4;
+  }
+
+  .nav-link {
+    font-size: 1rem;
+  }
+}
+
+/* Extra small devices */
+@media screen and (max-width: 360px) {
+  .logo-main {
+    font-size: 0.8rem;
+  }
+
+  .logo-sub {
+    font-size: 0.45rem;
+  }
+
+  .logo-wrapper {
+    gap: 0.3rem;
+  }
+}
+
+/* Landscape mode */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .navbar-links {
+    padding: 60px 2rem 1rem;
+    overflow-y: auto;
+    background: #3173b4;
+  }
+
+  .nav-menu {
+    gap: 1rem;
+  }
+
+  .nav-item {
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Loading Animation */
+@keyframes slideInFromTop {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.navbar {
+  animation: slideInFromTop 0.8s ease-out;
+}
+
+/* Additional hover effects */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ffd700, #ffffff);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* Glass morphism effect for scrolled navbar */
+.navbar-scrolled {
+  background: rgba(49, 115, 180, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Prevent body scroll when mobile menu is open */
+body.menu-open {
+  overflow: hidden;
+}
+
+/* Optional: Add a subtle pattern or gradient overlay */
+.navbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%);
+  background-size: 40px 40px;
+  pointer-events: none;
+}

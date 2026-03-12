@@ -1,0 +1,272 @@
+/* Expense History Component - Premium V7 */
+.expense-history-v7 {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.daily-group-v7 {
+  background: white;
+  border-radius: 24px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  overflow: hidden;
+  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.daily-group-v7:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
+}
+
+.group-header-v7 {
+  background: #f8fafc;
+  padding: 20px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.header-info-v7 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.calendar-icon-v7 {
+  font-size: 1.5rem;
+  background: white;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.date-stack-v7 h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.item-count-v7 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.header-stats-v7 {
+  text-align: right;
+}
+
+.total-label-v7 {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.total-amount-v7 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ef4444;
+}
+
+/* Data Grid Rows */
+.data-grid-v7 {
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-row-v7 {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.2s;
+}
+
+.grid-row-v7:last-child {
+  border-bottom: none;
+}
+
+.grid-row-v7:hover:not(.is-editing) {
+  background: #f8fbff;
+}
+
+.view-mode-v7 {
+  display: grid;
+  grid-template-columns: 200px 1fr 150px 100px;
+  align-items: center;
+  padding: 16px 32px;
+  gap: 24px;
+}
+
+.cell-category-v7 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-box-v7 {
+  width: 36px;
+  height: 36px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.category-name-v7 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.cell-desc-v7 p {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #1e293b;
+  margin: 0;
+}
+
+.timestamp-v7 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.cell-amount-v7 {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: #ef4444;
+  font-family: 'Inter', monospace;
+  text-align: right;
+}
+
+.cell-actions-v7 {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  opacity: 0; /* Hide by default */
+  transition: opacity 0.2s;
+}
+
+.grid-row-v7:hover .cell-actions-v7 {
+  opacity: 1;
+}
+
+.row-btn-v7 {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.row-btn-v7.edit:hover { background: #eff6ff; border-color: #3b82f6; }
+.row-btn-v7.delete:hover { background: #fef2f2; border-color: #ef4444; }
+
+/* Edit Mode Styling */
+.edit-mode-v7 {
+  padding: 16px 32px;
+  background: #f0f7ff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.edit-fields-v7 {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+}
+
+.edit-input-v7, .edit-select-v7 {
+  height: 40px;
+  padding: 0 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  outline: none;
+  background: white;
+}
+
+.edit-input-v7.desc { flex: 2; }
+.edit-input-v7.amount { flex: 1; }
+.edit-select-v7 { flex: 1; }
+
+.edit-actions-v7 {
+  display: flex;
+  gap: 8px;
+}
+
+.save-btn-v7, .cancel-btn-v7 {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: transform 0.2s;
+}
+
+.save-btn-v7 { background: #10b981; color: white; }
+.cancel-btn-v7 { background: #64748b; color: white; }
+
+.save-btn-v7:hover, .cancel-btn-v7:hover { transform: scale(1.1); }
+
+/* Empty State */
+.empty-state-v7 {
+  padding: 80px 40px;
+  text-align: center;
+  background: white;
+  border-radius: 24px;
+  border: 2px dashed #e2e8f0;
+}
+
+.empty-icon-v7 {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.empty-state-v7 h3 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.empty-state-v7 p {
+  color: #64748b;
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .view-mode-v7 {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .cell-amount-v7, .cell-actions-v7 { grid-column: span 1; }
+}
+
+@media (max-width: 640px) {
+  .view-mode-v7 { grid-template-columns: 1fr; gap: 12px; }
+  .cell-amount-v7 { text-align: left; }
+  .cell-actions-v7 { justify-content: flex-start; opacity: 1; }
+  .edit-fields-v7 { flex-direction: column; }
+}

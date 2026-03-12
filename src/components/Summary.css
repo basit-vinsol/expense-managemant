@@ -1,0 +1,133 @@
+/* Summary Component - Premium V12 */
+.summary-container-v12 {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.main-balance-card-v12 {
+  background: var(--primary);
+  border-radius: 24px;
+  padding: 40px;
+  color: white;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.3);
+  background-image: radial-gradient(at top left, #1e293b, #0f172a);
+}
+
+.balance-label-v12 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.balance-value-v12 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  margin-bottom: 16px;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.balance-footer-v12 {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.filtered-badge-v12 {
+  background: #f59e0b;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 100px;
+}
+
+.sync-text-v12 {
+  color: #10b981;
+}
+
+/* Secondary Stats V12 */
+.secondary-stats-v12 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.mini-stat-v12 {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.mini-icon-v12 {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.mini-info-v12 {
+  display: flex;
+  flex-direction: column;
+}
+
+.mini-info-v12 small {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.mini-info-v12 strong {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Progress Bar V12 */
+.budget-bar-v12 {
+  padding-top: 8px;
+}
+
+.bar-container-v12 {
+  height: 10px;
+  background: #f1f5f9;
+  border-radius: 100px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.bar-fill-v12 {
+  height: 100%;
+  border-radius: 100px;
+  transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (max-width: 640px) {
+  .secondary-stats-v12 {
+    grid-template-columns: 1fr;
+  }
+  .balance-value-v12 {
+    font-size: 2.5rem;
+  }
+}
