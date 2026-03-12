@@ -15,7 +15,7 @@ const Login = ({ onLogin }) => {
 
     // Real-time feel delay
     setTimeout(() => {
-      if (username === 'umervinsol' && password === 'umer123@') {
+      if (username === 'umarvinsol' && password === 'umar123@') {
         onLogin();
       } else {
         setError('Invalid username or password');
