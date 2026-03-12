@@ -5,15 +5,15 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
   const getTodayDate = () => new Date().toLocaleDateString('en-CA');
 
   const categories = [
-    'Office Stationery', 'Employee Stuff', 'Food', 'Transport', 
-    'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
+    'One-time Expense', 'Regular Expense', 'Office Stationery', 'Employee Stuff', 
+    'Food', 'Transport', 'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
   ];
 
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
     date: getTodayDate(),
-    category: 'Office Stationery'
+    category: 'Regular Expense'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);

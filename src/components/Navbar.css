@@ -253,7 +253,100 @@ body {
 
 /* ========== RESPONSIVE DESIGN ========== */
 /* Tablet and Mobile View */
-@media screen and (max-width: 968px) {
+/* Settings Dropdown V17 */
+.settings-dropdown-wrapper {
+  position: relative;
+}
+
+.settings-trigger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 15px);
+  right: 0;
+  width: 240px;
+  background: white;
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+  animation: dropdownFade 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes dropdownFade {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.settings-item:hover {
+  background: #f8fafc;
+}
+
+.settings-item.purge:hover {
+  background: #fff1f2;
+}
+
+.settings-item.logout:hover {
+  background: #f1f5f9;
+}
+
+.item-icon {
+  font-size: 1.25rem;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-text strong {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.item-text small {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.settings-item.purge strong { color: #ef4444; }
+
+@media (max-width: 968px) {
+  .settings-dropdown {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.05);
+    margin-top: 10px;
+  }
+  .item-text strong { color: white !important; }
+  
   .logo-main {
     font-size: 1.2rem;
   }

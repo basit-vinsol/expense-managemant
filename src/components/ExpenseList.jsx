@@ -6,12 +6,14 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
   const [editForm, setEditForm] = useState({});
 
   const categories = [
-    'Office Stationery', 'Employee Stuff', 'Food', 'Transport', 
-    'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
+    'One-time Expense', 'Regular Expense', 'Office Stationery', 'Employee Stuff', 
+    'Food', 'Transport', 'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
   ];
 
   const getCategoryIcon = (category) => {
     const icons = {
+      'One-time Expense': '⚡',
+      'Regular Expense': '🔄',
       'Office Stationery': '📎',
       'Employee Stuff': '👨‍💼',
       'Food': '🍱',
@@ -31,7 +33,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
       description: expense.description || '', 
       amount: expense.amount || '', 
       date: expense.date || new Date().toISOString().split('T')[0], 
-      category: expense.category || 'Office Stationery' 
+      category: expense.category || 'Regular Expense' 
     });
   };
 

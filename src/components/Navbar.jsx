@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import './Navbar.css';
 import logo from '../assets/vinlogo.png';
 
-const Navbar = () => {
+const Navbar = ({ onPurge, onLogout }) => {
   const [scrolled, setScrolled] = useState(false);
   const [hoveredLink, setHoveredLink] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -83,6 +84,34 @@ const Navbar = () => {
                 <span className="link-text">Visit Ruqaba</span>
                 <span className="link-hover-effect"></span>
               </a>
+            </li>
+            
+            <li className="nav-item settings-dropdown-wrapper">
+              <button 
+                className={`nav-link settings-trigger ${settingsOpen ? 'active' : ''}`}
+                onClick={() => setSettingsOpen(!settingsOpen)}
+              >
+                <span className="link-text">⚙️ Settings</span>
+              </button>
+              
+              {settingsOpen && (
+                <div className="settings-dropdown">
+                  <button className="settings-item purge" onClick={() => { onPurge(); setSettingsOpen(false); }}>
+                    <span className="item-icon">🗑️</span>
+                    <div className="item-text">
+                      <strong>Purge System</strong>
+                      <small>Delete all data</small>
+                    </div>
+                  </button>
+                  <button className="settings-item logout" onClick={() => { onLogout(); setSettingsOpen(false); }}>
+                    <span className="item-icon">🚪</span>
+                    <div className="item-text">
+                      <strong>Logout</strong>
+                      <small>Sign out of account</small>
+                    </div>
+                  </button>
+                </div>
+              )}
             </li>
           </ul>
         </div>

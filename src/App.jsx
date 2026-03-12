@@ -8,9 +8,15 @@ import MonthlyOverview from './components/MonthlyOverview';
 import SearchBar from './components/SearchBar';
 import Filters from './components/Filters';
 import PrintReport from './components/PrintReport';
+import Login from './components/Login';
 import './App.css';
 
 const App = () => {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
+
   // State management
   const [totalFunds, setTotalFunds] = useState(() => {
     try {
@@ -48,6 +54,18 @@ const App = () => {
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem('isLoggedIn', 'true');
+    showNotification('Welcome back, Umer!', 'success');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('isLoggedIn');
+    showNotification('Logged out successfully', 'info');
+  };
 
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzyTfcUzcbiWBYN9ynwSZzqijuM5ldBa8ZSdYAKqa6f9wt6ZVFt4OnB98xq_ax0YdjKDQ/exec';
 
@@ -464,9 +482,13 @@ const App = () => {
     ? calculateFilteredTotals() 
     : totals;
 
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app">
-      <Navbar />
+      <Navbar onPurge={handleClearAll} onLogout={handleLogout} />
       
       {notification.show && (
         <div className={`notification-v8 ${notification.type}`}>
@@ -598,14 +620,6 @@ const App = () => {
                         <div className="btn-label-v13">
                           <strong>Cloud Sync</strong>
                           <small>Push to Google Sheets</small>
-                        </div>
-                      </button>
-
-                      <button className="console-btn-v13 purge-btn-v13" onClick={handleClearAll}>
-                        <span className="btn-icon-v13">🧹</span>
-                        <div className="btn-label-v13">
-                          <strong>Purge System</strong>
-                          <small>Full database reset</small>
                         </div>
                       </button>
                     </div>
