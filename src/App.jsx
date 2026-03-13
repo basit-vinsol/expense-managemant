@@ -100,7 +100,6 @@ const App = () => {
     setUserType(null);
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('userType');
-    // Don't remove data on logout
     showNotification('👋 Logged out successfully', 'info');
   };
 
@@ -215,6 +214,17 @@ const App = () => {
   // ==================== UTILITY FUNCTIONS ====================
   const formatPKR = (amount) => {
     if (amount === undefined || amount === null) return 'Rs 0';
+    
+    // If amount is negative, show with minus sign
+    if (amount < 0) {
+      return `-${new Intl.NumberFormat('en-PK', {
+        style: 'currency',
+        currency: 'PKR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(Math.abs(amount))}`;
+    }
+    
     return new Intl.NumberFormat('en-PK', {
       style: 'currency',
       currency: 'PKR',
@@ -294,7 +304,6 @@ const App = () => {
   const totals = calculateTotals();
 
   // ==================== CORE FUNCTIONS ====================
-  // Modified: Password protected purge for both user and admin
   const handleClearAll = () => {
     setShowPasswordModal(true);
     setPasswordInput('');
@@ -337,22 +346,16 @@ const App = () => {
         description: description,
         date: new Date().toISOString(),
         runningTotal: totals.totalFundsAdded + amount,
-        type: 'credit',
-        isSelfFunded: fundData.isSelfFunded || false
+        type: 'credit'
       };
 
       setFundHistory(prev => [newFundEntry, ...prev]);
       setTotalFunds(prev => prev + amount);
       
-      if (fundData.isSelfFunded) {
-        showNotification(`👤 Self-funded: ${formatPKR(amount)} added`, 'warning');
-      } else {
-        showNotification(`💰 Funds added: ${formatPKR(amount)}`, 'success');
-      }
+      showNotification(`💰 Funds added: ${formatPKR(amount)}`, 'success');
     }
   };
 
-  // Add expense with proper image handling
   const handleAddExpense = (expenseData) => {
     if (!expenseData || !expenseData.amount) {
       showNotification('❌ Invalid expense data!', 'error');
@@ -360,12 +363,6 @@ const App = () => {
     }
 
     const amount = parseFloat(expenseData.amount);
-
-    if (amount > totals.currentBalance) {
-      showNotification(`⚠️ Insufficient funds! Available: ${formatPKR(totals.currentBalance)}`, 'error');
-      return false;
-    }
-
     const expenseType = expenseData.expenseType || 'regular';
 
     // Create new expense
@@ -379,7 +376,7 @@ const App = () => {
       timestamp: Date.now()
     };
 
-    // Add image if exists - store as is (base64)
+    // Add image if exists
     if (expenseData.imageUrl) {
       newExpense.imageUrl = expenseData.imageUrl;
     }
@@ -392,13 +389,16 @@ const App = () => {
 
     setExpenses(prev => [newExpense, ...prev]);
     
+    // Calculate new running total (can go negative)
+    const newRunningTotal = totals.currentBalance - amount;
+    
     // Add to fund history
     const deductionEntry = {
       id: Date.now() + 1,
       amount: -amount,
       description: `${expenseType.toUpperCase()}: ${expenseData.description}`,
       date: new Date().toISOString(),
-      runningTotal: totals.currentBalance - amount,
+      runningTotal: newRunningTotal,
       type: 'debit',
       category: expenseData.category,
       expenseType: expenseType
@@ -417,7 +417,11 @@ const App = () => {
       'bill': '📄'
     };
     
-    showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}`, 'success');
+    if (newRunningTotal < 0) {
+      showNotification(`⚠️ ${typeIcons[expenseType]} Expense added! Balance is now negative: ${formatPKR(newRunningTotal)}`, 'warning');
+    } else {
+      showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}`, 'success');
+    }
     
     return true;
   };
@@ -456,11 +460,6 @@ const App = () => {
     if (!oldExpense) return;
 
     const amountDifference = updatedExpense.amount - oldExpense.amount;
-
-    if (amountDifference > totals.currentBalance) {
-      showNotification('⚠️ Insufficient funds for this update!', 'error');
-      return;
-    }
 
     setExpenses(prev => prev.map(expense =>
       expense.id === id ? { ...expense, ...updatedExpense } : expense
@@ -577,7 +576,7 @@ const App = () => {
     return <Login onLogin={handleLogin} onAdminLogin={handleAdminLogin} />;
   }
 
-  // ==================== PASSWORD MODAL FOR PURGE (Shared between User & Admin) ====================
+  // ==================== PASSWORD MODAL FOR PURGE ====================
   const PasswordModal = () => (
     <div className="password-modal-overlay">
       <div className="password-modal">
@@ -725,9 +724,13 @@ const App = () => {
             <div className="kpi-card green">
               <div className="card-icon">⚖️</div>
               <div className="card-content">
-                <span className="card-label">Balance</span>
-                <span className="card-value">{formatPKR(totals.currentBalance)}</span>
-                <span className="card-badge">Available</span>
+                <span className="card-label">Current Balance</span>
+                <span className={`card-value ${totals.currentBalance < 0 ? 'negative' : ''}`}>
+                  {formatPKR(totals.currentBalance)}
+                </span>
+                {totals.currentBalance < 0 && (
+                  <span className="card-badge negative">Overdraft</span>
+                )}
               </div>
             </div>
             <div className="kpi-card orange">
@@ -736,7 +739,7 @@ const App = () => {
                 <span className="card-label">Usage</span>
                 <span className="card-value">{totals.usedPercentage}%</span>
                 <div className="progress-mini">
-                  <div className="progress-fill" style={{ width: `${totals.usedPercentage}%` }}></div>
+                  <div className="progress-fill" style={{ width: `${Math.min(totals.usedPercentage, 100)}%` }}></div>
                 </div>
               </div>
             </div>
@@ -869,7 +872,9 @@ const App = () => {
                           <td className={item.type}>
                             {item.type === 'credit' ? '+' : '-'}{formatPKR(Math.abs(item.amount))}
                           </td>
-                          <td>{formatPKR(item.runningTotal)}</td>
+                          <td className={item.runningTotal < 0 ? 'negative' : ''}>
+                            {formatPKR(item.runningTotal)}
+                          </td>
                           <td>
                             {item.imageUrl ? (
                               <button 
@@ -935,7 +940,7 @@ const App = () => {
                     </select>
                   </div>
 
-                  {/* Data Management Setting */}
+                  {/* Data Management Setting - Fixed with working buttons */}
                   <div className="setting-card">
                     <h4>Data Management</h4>
                     <button onClick={handleSyncToSheets} className="setting-btn sync" disabled={isSyncing}>
@@ -996,7 +1001,7 @@ const App = () => {
     );
   }
 
-  // ==================== REGULAR USER VIEW (WITH PASSWORD PROTECTED PURGE) ====================
+  // ==================== REGULAR USER VIEW ====================
   return (
     <div className="app">
       {/* Password Modal for User */}
@@ -1049,7 +1054,6 @@ const App = () => {
             <ExpenseForm
               type="expense"
               onSubmit={handleAddExpense}
-              maxAmount={totals.currentBalance}
               formatPKR={formatPKR}
               currentBalance={totals.currentBalance}
             />
@@ -1172,7 +1176,7 @@ const App = () => {
                 </div>
                 <div className="footer-meta-v13">
                   <span>AES-256 Encrypted Sync</span>
-                  <span className="version-tag-v13">v13.0.2 Premium Console</span>
+                  <span className="version-tag-v13">v3.0.0</span>
                 </div>
               </div>
             </div>

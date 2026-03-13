@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import './ExpenseForm.css';
 
-const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) => {
+const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
   const getTodayDate = () => new Date().toLocaleDateString('en-CA');
 
-  // Original categories (excluding One-time Expense, Regular Expense, Bills)
   const categories = [
-    'Office Stationery', 'Employee Stuff', 'Food', 'Transport', 
-    'Utilities', 'Marketing', 'Maintenance', 'Other'
+    'One-time Expense', 'Regular Expense', 'Office Stationery', 'Employee Stuff', 
+    'Food', 'Transport', 'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
   ];
 
   // Expense types for tracking
@@ -25,9 +24,8 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
     expenseType: '',
     selectionMode: 'none',
     notes: '',
-    isSelfFunded: false,
-    image: null, // For storing the image file
-    imagePreview: null // For preview
+    image: null,
+    imagePreview: null
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,24 +49,18 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
-    }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle image selection
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         alert('Image size should be less than 5MB');
         return;
       }
 
-      // Check file type
       if (!file.type.startsWith('image/')) {
         alert('Please select an image file');
         return;
@@ -86,21 +78,18 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
     }
   };
 
-  // Remove image
   const handleRemoveImage = () => {
     setFormData(prev => ({
       ...prev,
       image: null,
       imagePreview: null
     }));
-    // Reset file input
     document.getElementById('image-upload').value = '';
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.description || !formData.amount) return;
     
     if (type === 'expense' && !formData.category && !formData.expenseType) {
@@ -113,7 +102,6 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
     await new Promise(resolve => setTimeout(resolve, 400));
     
     try {
-      // Prepare expense data
       const submitData = {
         ...formData,
         amount: parseFloat(formData.amount),
@@ -121,12 +109,10 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
         timestamp: new Date().toISOString()
       };
 
-      // Handle image - convert to base64 for storage
       if (formData.imagePreview) {
         submitData.imageUrl = formData.imagePreview;
       }
 
-      // Handle different selection modes
       if (type === 'expense') {
         if (formData.expenseType) {
           submitData.expenseType = formData.expenseType;
@@ -136,22 +122,10 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
           submitData.expenseType = 'regular';
           submitData.category = formData.category;
         }
-      } else {
-        // For funds, add self-funded flag to description if checked
-        if (formData.isSelfFunded) {
-          submitData.description = `[SELF-FUNDED] ${formData.description}`;
-          submitData.selfFunded = true;
-        }
-        
-        // Add notes to description if provided
-        if (formData.notes) {
-          submitData.description = `${submitData.description} (Note: ${formData.notes})`;
-        }
       }
 
       await onSubmit(submitData);
       
-      // Reset form
       setFormData({
         description: '',
         amount: '',
@@ -160,12 +134,10 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
         expenseType: '',
         selectionMode: 'none',
         notes: '',
-        isSelfFunded: false,
         image: null,
         imagePreview: null
       });
       
-      // Reset file input
       const fileInput = document.getElementById('image-upload');
       if (fileInput) fileInput.value = '';
       
@@ -177,7 +149,9 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
   };
 
   const isExpense = type === 'expense';
-  const isFunds = type === 'funds';
+
+  // Determine balance color class
+  const balanceClass = currentBalance < 0 ? 'negative' : 'positive';
 
   return (
     <form className={`expense-form-v5 ${type}`} onSubmit={handleSubmit}>
@@ -207,7 +181,6 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
               placeholder="0.00"
               value={formData.amount}
               onChange={handleChange}
-              max={isExpense ? maxAmount : undefined}
               required
             />
           </div>
@@ -257,48 +230,20 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
           </div>
         )}
 
-        {/* Self-Funded Checkbox - Only for Funds */}
-        {isFunds && (
-          <div className="form-group-v5 self-funded-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="isSelfFunded"
-                checked={formData.isSelfFunded}
-                onChange={handleChange}
-              />
-              <span className="checkbox-custom"></span>
-              <span className="checkbox-text">
-                <strong>Self-Funded</strong>
-                <small> (I added money from my own pocket)</small>
-              </span>
-            </label>
-          </div>
-        )}
-
-        {/* Notes Field - For both Expense and Funds */}
+        {/* Notes Field */}
         <div className="form-group-v5">
           <label>Notes (Optional)</label>
           <div className="input-wrapper">
             <span className="input-icon">📌</span>
             <textarea
               name="notes"
-              placeholder={isFunds && formData.isSelfFunded 
-                ? "Why are you adding self funds? (e.g., Petty cash, Personal contribution)" 
-                : isExpense 
-                  ? "Add any additional details about this expense" 
-                  : "Add any notes about this transaction"}
+              placeholder="Add any additional details"
               value={formData.notes}
               onChange={handleChange}
               rows="2"
               className="notes-textarea"
             />
           </div>
-          {isFunds && formData.isSelfFunded && (
-            <small className="field-hint" style={{ color: '#e67e22', marginTop: '4px', display: 'block' }}>
-              ⚠️ Admin will be notified that this is a self-funded addition
-            </small>
-          )}
         </div>
 
         {isExpense && (
@@ -413,19 +358,17 @@ const ExpenseForm = ({ type, onSubmit, maxAmount, formatPKR, currentBalance }) =
           <span className="spinner"></span>
         ) : (
           <>
-            <span className="btn-icon-v5">
-              {isExpense ? '💸' : isFunds && formData.isSelfFunded ? '👤💰' : '📥'}
-            </span>
-            {isExpense ? 'Record Expense' : isFunds && formData.isSelfFunded ? 'Add Self Funds' : 'Add to Balance'}
+            <span className="btn-icon-v5">{isExpense ? '💸' : '💰'}</span>
+            {isExpense ? 'Record Expense' : 'Add Funds'}
           </>
         )}
       </button>
 
-      {isExpense && maxAmount !== undefined && (
-        <p className="balance-hint">
-          Remaining: <strong>{formatPKR(maxAmount)}</strong>
-        </p>
-      )}
+      {/* Balance Display Below Button */}
+      <div className={`balance-display ${balanceClass}`}>
+        <span className="balance-label">Available Balance:</span>
+        <span className="balance-amount">{formatPKR(currentBalance)}</span>
+      </div>
     </form>
   );
 };
