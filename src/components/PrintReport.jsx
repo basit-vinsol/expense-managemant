@@ -2,7 +2,7 @@ import React from 'react';
 import './PrintReport.css';
 import vinlogo from '../assets/vinlogo.png';
 
-const PrintReport = ({ expenses, fundHistory, totals, formatPKR, lastUpdated, filteredExpenses }) => {
+const PrintReport = ({ expenses, fundHistory, totals, formatPKR, lastUpdated, filteredExpenses, onLogout }) => {
   const [selectedDate, setSelectedDate] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -29,8 +29,8 @@ const PrintReport = ({ expenses, fundHistory, totals, formatPKR, lastUpdated, fi
       const localDate = new Date(year, month - 1, day);
       reportTitle = `Financial Report for ${localDate.toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' })}`;
     } else if (type === 'range' && startDate && endDate) {
-      filteredExpenses = expenses.filter(e => e.date >= startDate && e.date <= endDate);
-      filteredHistory = fundHistory.filter(h => {
+      filteredEx = expenses.filter(e => e.date >= startDate && e.date <= endDate);
+      filteredHist = fundHistory.filter(h => {
         const hDate = h.date.split('T')[0];
         return hDate >= startDate && hDate <= endDate;
       });

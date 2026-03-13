@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './Login.css';
 import logo from '../assets/vinlogo.png';
 
-const Login = ({ onLogin }) => {
+const Login = ({ onLogin, onAdminLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,9 +15,15 @@ const Login = ({ onLogin }) => {
 
     // Real-time feel delay
     setTimeout(() => {
-      if (username === 'umarvinsol' && password === 'umar123@') {
-        onLogin();
-      } else {
+      // Admin login check
+      if (username === 'adminvinsol' && password === 'admin123') {
+        onAdminLogin(); // Call admin login function
+      }
+      // Regular user login check
+      else if (username === 'umarvinsol' && password === 'umar123@') {
+        onLogin(); // Call regular login function
+      } 
+      else {
         setError('Invalid username or password');
         setIsLoading(false);
       }
