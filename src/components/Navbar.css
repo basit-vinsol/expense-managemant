@@ -1,0 +1,383 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  padding-top: 70px;
+}
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
+  transition: all 0.25s ease;
+}
+
+.navbar-scrolled {
+  background: rgba(37, 99, 235, 0.96);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 26px rgba(37, 99, 235, 0.32);
+}
+
+.navbar-container {
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.navbar-logo {
+  flex: 0 0 auto;
+}
+
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.logo-wrapper:hover {
+  opacity: 0.9;
+}
+
+.logo-image {
+  width: auto;
+  height: 46px;
+  filter: brightness(0) invert(1);
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.logo-main {
+  font-size: 1.25rem;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.logo-sub {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.04em;
+}
+
+.navbar-links {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.nav-menu {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 0.58rem 0.78rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.link-text {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.link-hover-effect {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #facc15, #ffffff);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover .link-hover-effect,
+.nav-link.hovered .link-hover-effect,
+.settings-trigger.active .link-hover-effect,
+.att-active .link-hover-effect {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.attendance-tab {
+  background: transparent;
+}
+
+.att-active .link-text {
+  color: #fde68a;
+}
+
+.settings-dropdown-wrapper {
+  position: relative;
+}
+
+.settings-trigger {
+  background: transparent;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 244px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.14);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1100;
+}
+
+.settings-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-item:hover {
+  background: #f8fafc;
+}
+
+.settings-item.purge:hover {
+  background: #fef2f2;
+}
+
+.settings-item.logout:hover {
+  background: #eff6ff;
+}
+
+.item-icon {
+  font-size: 1.1rem;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-text strong {
+  font-size: 0.84rem;
+  color: #0f172a;
+}
+
+.item-text small {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+.settings-item.purge .item-text strong {
+  color: #dc2626;
+}
+
+.navbar-mobile-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.navbar-mobile-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.bar {
+  width: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: #ffffff;
+  margin: 0 auto;
+  transition: all 0.25s ease;
+}
+
+.navbar-mobile-toggle.active .bar:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.navbar-mobile-toggle.active .bar:nth-child(2) {
+  opacity: 0;
+}
+
+.navbar-mobile-toggle.active .bar:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.mobile-menu-overlay {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  .nav-link {
+    font-size: 0.86rem;
+    padding: 0.54rem 0.62rem;
+  }
+  .logo-main {
+    font-size: 1.12rem;
+  }
+  .logo-sub {
+    font-size: 0.66rem;
+  }
+}
+
+@media (max-width: 968px) {
+  body {
+    padding-top: 64px;
+  }
+
+  .navbar {
+    min-height: 64px;
+    padding: 0.6rem 0.9rem;
+  }
+
+  .navbar-mobile-toggle {
+    display: flex;
+  }
+
+  .navbar-links {
+    position: fixed;
+    top: 64px;
+    right: 0;
+    width: min(320px, 84vw);
+    height: calc(100vh - 64px);
+    background: linear-gradient(160deg, #2563eb 0%, #7c3aed 100%);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    justify-content: flex-start;
+    padding: 14px;
+    z-index: 1100;
+    overflow-y: auto;
+  }
+
+  .navbar-links.active {
+    transform: translateX(0);
+  }
+
+  .nav-menu {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .nav-item {
+    width: 100%;
+  }
+
+  .nav-link {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 12px;
+    padding: 0.85rem 0.9rem;
+    font-size: 0.94rem;
+  }
+
+  .settings-dropdown {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+  }
+
+  .item-text strong,
+  .item-text small {
+    color: #ffffff;
+  }
+
+  .settings-item.purge .item-text strong {
+    color: #fecaca;
+  }
+
+  .mobile-menu-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.25s ease;
+    z-index: 1050;
+  }
+
+  .mobile-menu-overlay.active {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-image {
+    height: 38px;
+  }
+
+  .logo-main {
+    font-size: 1rem;
+  }
+
+  .logo-sub {
+    font-size: 0.62rem;
+  }
+
+  .navbar-links {
+    width: 100%;
+  }
+}
