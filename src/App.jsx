@@ -184,6 +184,99 @@ const App = () => {
     }
   };
 
+  // ==================== NEW: FETCH FROM GOOGLE SHEETS ====================
+  const handleFetchFromSheets = async () => {
+    if (isSyncing) return;
+    
+    setIsSyncing(true);
+    showNotification('📥 Fetching data from Google Sheets...', 'info');
+
+    try {
+      const cleanUrl = GAS_URL.trim();
+      const response = await fetch(`${cleanUrl}?type=expenses`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const json = await response.json();
+
+      if (!json.success) {
+        throw new Error(json.message || 'Failed to fetch data from Google Sheets');
+      }
+
+      if (!json.data || !json.data.expenses || json.data.expenses.length === 0) {
+        showNotification('📭 No cloud data found.', 'warning');
+        setIsSyncing(false);
+        return;
+      }
+
+      const { summary, expenses: sheetExpenses, fundHistory: sheetFundHistory } = json.data;
+
+      // Process expenses
+      let processedExpenses = [];
+      if (Array.isArray(sheetExpenses) && sheetExpenses.length > 0) {
+        processedExpenses = sheetExpenses.map((expense) => ({
+          ...expense,
+          id: expense.id || Date.now() + Math.random(),
+          date: normalizeExpenseDate(expense.date),
+          amount: Number(expense.amount) || 0,
+          expenseType: expense.expenseType || 'regular'
+        }));
+      }
+
+      // Process fund history
+      let processedFundHistory = [];
+      if (Array.isArray(sheetFundHistory) && sheetFundHistory.length > 0) {
+        processedFundHistory = sheetFundHistory.map((item) => ({
+          ...item,
+          id: item.id || Date.now() + Math.random(),
+          amount: Number(item.amount) || 0,
+          date: item.date || new Date().toISOString(),
+          runningTotal: Number(item.runningTotal) || 0,
+          type: item.type || (Number(item.amount) >= 0 ? 'credit' : 'debit')
+        }));
+      }
+
+      // Update state with fetched data
+      setExpenses(processedExpenses);
+      localStorage.setItem('expenses', JSON.stringify(processedExpenses));
+
+      setFundHistory(processedFundHistory);
+      localStorage.setItem('fundHistory', JSON.stringify(processedFundHistory));
+
+      // Update total funds
+      let totalFundsFromSheet = 0;
+      if (summary) {
+        totalFundsFromSheet = Number(summary.totalFundsAdded) || 0;
+      } else {
+        // Calculate from fund history
+        totalFundsFromSheet = processedFundHistory
+          .filter(item => item.type === 'credit')
+          .reduce((sum, item) => sum + item.amount, 0);
+      }
+      setTotalFunds(totalFundsFromSheet);
+      localStorage.setItem('totalFunds', String(totalFundsFromSheet));
+
+      setLastUpdated(new Date().toLocaleTimeString());
+      setSystemMetrics(prev => ({ 
+        ...prev, 
+        totalTransactions: processedFundHistory.length,
+        lastBackup: 'Just now',
+        syncStatus: 'online'
+      }));
+
+      showNotification(`✅ Data successfully imported from Google Sheets! (${processedExpenses.length} expenses)`, 'success');
+      
+    } catch (error) {
+      console.error('Fetch from Sheets error:', error);
+      showNotification(`❌ Failed to fetch from Google Sheets: ${error.message || 'Unknown error'}`, 'error');
+      setSystemMetrics(prev => ({ ...prev, syncStatus: 'offline' }));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
     
@@ -269,14 +362,6 @@ const App = () => {
     }
     return () => clearInterval(interval);
   }, [userType, autoRefresh, refreshInterval]);
-
-  // ==================== AUTO SYNC EVERY 10 SECONDS ====================
-  // Removed automatic Google Sheets fetch and refresh behavior.
-  // Data will now only be loaded or pushed to Sheets when a user explicitly triggers sync.
-
-
-  // Removed automatic sync interval. Sync to Google Sheets now occurs only through explicit user action.
-
 
   // ==================== LOCAL STORAGE SAVE ====================
   useEffect(() => {
@@ -950,7 +1035,11 @@ const App = () => {
                   </button>
                   <button className="quick-action" onClick={handleSyncToSheets} disabled={isSyncing}>
                     <span className="qa-icon">{isSyncing ? '🔄' : '☁️'}</span>
-                    <span>{isSyncing ? 'Syncing...' : 'Cloud Sync'}</span>
+                    <span>{isSyncing ? 'Syncing...' : 'Push to Cloud'}</span>
+                  </button>
+                  <button className="quick-action" onClick={handleFetchFromSheets} disabled={isSyncing}>
+                    <span className="qa-icon">{isSyncing ? '🔄' : '📥'}</span>
+                    <span>{isSyncing ? 'Fetching...' : 'Fetch from Cloud'}</span>
                   </button>
                   <button className="quick-action" onClick={() => setAdminView('audit')}>
                     <span className="qa-icon">🔍</span>
@@ -1100,13 +1189,22 @@ const App = () => {
                     </select>
                   </div>
 
-                  {/* Data Management Setting - Fixed with working buttons */}
+                  {/* Data Management Setting - Updated with Fetch button */}
                   <div className="setting-card">
                     <h4>Data Management</h4>
-                    <button onClick={handleSyncToSheets} className="setting-btn sync" disabled={isSyncing}>
-                      <span className="btn-icon">{isSyncing ? '🔄' : '☁️'}</span>
-                      <span className="btn-text">{isSyncing ? 'Syncing...' : 'Sync to Cloud'}</span>
-                    </button>
+                    <div className="cloud-sync-group">
+                      <button onClick={handleSyncToSheets} className="setting-btn sync" disabled={isSyncing}>
+                        <span className="btn-icon">{isSyncing ? '🔄' : '☁️'}</span>
+                        <span className="btn-text">Push to Google Sheets</span>
+                      </button>
+                      <button onClick={handleFetchFromSheets} className="setting-btn fetch" disabled={isSyncing}>
+                        <span className="btn-icon">{isSyncing ? '🔄' : '📥'}</span>
+                        <span className="btn-text">Fetch from Google Sheets</span>
+                      </button>
+                    </div>
+                    <div className="setting-help-text">
+                      <small>Push saves local data to cloud • Fetch downloads cloud data to this device</small>
+                    </div>
                     <button onClick={handleClearAll} className="setting-btn purge">
                       <span className="btn-icon">🗑️</span>
                       <span className="btn-text">Purge All Data</span>
@@ -1243,9 +1341,9 @@ const App = () => {
               filterMonth={filterMonth}
               setFilterMonth={setFilterMonth}
               filterStartDate={filterStartDate}
-              setFilterStartDate={filterStartDate}
+              setFilterStartDate={setFilterStartDate}
               filterEndDate={filterEndDate}
-              setFilterEndDate={filterEndDate}
+              setFilterEndDate={setFilterEndDate}
               sortBy={sortBy}
               setSortBy={setSortBy}
               expenses={expenses}
@@ -1302,8 +1400,19 @@ const App = () => {
                       >
                         <span className="btn-icon-v13">{isSyncing ? '🔄' : '☁️'}</span>
                         <div className="btn-label-v13">
-                          <strong>Cloud Sync</strong>
-                          <small>Push to Google Sheets</small>
+                          <strong>Push to Google Sheets</strong>
+                          <small>Upload local data to cloud</small>
+                        </div>
+                      </button>
+                      <button 
+                        className={`console-btn-v13 fetch-btn-v13 ${isSyncing ? 'active' : ''}`} 
+                        onClick={handleFetchFromSheets}
+                        disabled={isSyncing}
+                      >
+                        <span className="btn-icon-v13">{isSyncing ? '🔄' : '📥'}</span>
+                        <div className="btn-label-v13">
+                          <strong>Fetch from Google Sheets</strong>
+                          <small>Download cloud data to this device</small>
                         </div>
                       </button>
                     </div>
