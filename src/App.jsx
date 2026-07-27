@@ -13,16 +13,15 @@ import Attendance from './components/Attendance';
 import vinlogo from './assets/vinlogo.png';
 import './App.css';
 import './AdminDashboard.css';
+import Swal from 'sweetalert2';
 
 const App = () => {
   // ==================== AUTHENTICATION STATE ====================
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    // Agar koi aur already logged in hai toh is tab ko login page dikhao
     const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        return loggedIn; // Allow multiple devices/tabs to login with same account
+    return loggedIn;
   });
   const [userType, setUserType] = useState(() => {
-    // Get userType directly without session matching
     return localStorage.getItem('userType') || null;
   });
 
@@ -119,11 +118,10 @@ const App = () => {
   // ==================== SINGLE SESSION ENFORCEMENT ====================
   useEffect(() => {
     const handleStorageChange = (e) => {
-          // Keep this minimal - only logout when isLoggedIn is explicitly cleared
-          if (e.key === 'isLoggedIn' && !e.newValue) {
-            setIsAuthenticated(false);
-            setUserType(null);
-          }
+      if (e.key === 'isLoggedIn' && !e.newValue) {
+        setIsAuthenticated(false);
+        setUserType(null);
+      }
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -139,55 +137,164 @@ const App = () => {
     return Number.isNaN(parsed.getTime()) ? new Date().toISOString().split('T')[0] : parsed.toISOString().split('T')[0];
   };
 
-  const loadSharedDataFromSheets = async () => {
+  // ==================== CHECK STORAGE AVAILABILITY ====================
+  const checkStorageAvailable = () => {
     try {
-      const cleanUrl = GAS_URL.trim();
-      const response = await fetch(`${cleanUrl}?type=expenses`);
-      const json = await response.json();
-
-      if (!json.success || !json.data) return false;
-
-      const { summary, expenses: sheetExpenses, fundHistory: sheetFundHistory } = json.data;
-
-      if (Array.isArray(sheetExpenses)) {
-        const normalizedExpenses = sheetExpenses.map((expense) => ({
-          ...expense,
-          date: normalizeExpenseDate(expense.date),
-          amount: Number(expense.amount) || 0
-        }));
-        setExpenses(normalizedExpenses);
-        localStorage.setItem('expenses', JSON.stringify(normalizedExpenses));
-      }
-
-      if (Array.isArray(sheetFundHistory)) {
-        const normalizedHistory = sheetFundHistory.map((item) => ({
-          ...item,
-          amount: Number(item.amount) || 0,
-          date: item.date || new Date().toISOString(),
-          runningTotal: Number(item.runningTotal) || 0
-        }));
-        setFundHistory(normalizedHistory);
-        localStorage.setItem('fundHistory', JSON.stringify(normalizedHistory));
-      }
-
-      if (summary) {
-        const totalFundsFromSheet = Number(summary.totalFundsAdded) || 0;
-        setTotalFunds(totalFundsFromSheet);
-        localStorage.setItem('totalFunds', String(totalFundsFromSheet));
-      }
-
-      setLastUpdated(new Date().toLocaleTimeString());
+      const test = 'storage_test';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
       return true;
-    } catch (error) {
-      console.error('Failed to load shared sheet data:', error);
+    } catch (e) {
       return false;
     }
   };
 
-  // ==================== NEW: FETCH FROM GOOGLE SHEETS ====================
+  const getStorageSize = () => {
+    let total = 0;
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        total += localStorage[key].length * 2; // UTF-16
+      }
+    }
+    return (total / 1024 / 1024).toFixed(2); // MB
+  };
+
+  // ==================== HELPER: COMPRESS IMAGE TO BASE64 (THUMBNAIL) ====================
+  const compressImageToBase64 = (file, maxWidth = 300, quality = 0.5) => {
+    return new Promise((resolve, reject) => {
+      // Check file size first
+      if (file.size > 2 * 1024 * 1024) { // 2MB
+        reject(new Error('Image too large! Please use image under 2MB.'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Reduce size more aggressively
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to JPEG with lower quality
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          
+          // Check if compressed size is reasonable (under 100KB)
+          const sizeInKB = (compressedBase64.length * 3) / 4 / 1024;
+          if (sizeInKB > 150) {
+            // Try again with even lower quality
+            const smallerBase64 = canvas.toDataURL('image/jpeg', 0.3);
+            resolve(smallerBase64);
+          } else {
+            resolve(compressedBase64);
+          }
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  // ==================== CLEAN OLD IMAGES FROM STORAGE ====================
+  const cleanStorage = () => {
+    try {
+      const expensesData = JSON.parse(localStorage.getItem('expenses') || '[]');
+      const fundHistoryData = JSON.parse(localStorage.getItem('fundHistory') || '[]');
+      
+      // Keep only last 50 items with images
+      const maxItems = 50;
+      
+      if (expensesData.length > maxItems) {
+        const cleaned = expensesData.slice(0, maxItems);
+        localStorage.setItem('expenses', JSON.stringify(cleaned));
+        setExpenses(cleaned);
+      }
+      
+      if (fundHistoryData.length > maxItems) {
+        const cleaned = fundHistoryData.slice(0, maxItems);
+        localStorage.setItem('fundHistory', JSON.stringify(cleaned));
+        setFundHistory(cleaned);
+      }
+      
+      const size = getStorageSize();
+      setSystemMetrics(prev => ({ ...prev, storageUsed: `${size} MB` }));
+      
+      return true;
+    } catch (e) {
+      console.error('Clean storage error:', e);
+      return false;
+    }
+  };
+
+  // ==================== SAFE LOCALSTORAGE SET ====================
+  const safeSetItem = (key, value) => {
+    try {
+      // Check if storage is available
+      if (!checkStorageAvailable()) {
+        showNotification('⚠️ Storage is full! Cleaning up old data...', 'warning');
+        cleanStorage();
+        return false;
+      }
+      
+      // Check current storage size
+      const currentSize = getStorageSize();
+      if (parseFloat(currentSize) > 4.5) { // 4.5MB warning
+        showNotification('⚠️ Storage is getting full (>4.5MB). Consider syncing and clearing old data.', 'warning');
+      }
+      
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      if (error.name === 'QuotaExceededError') {
+        showNotification('⚠️ Storage is full! Cleaning up old data...', 'warning');
+        cleanStorage();
+        // Try again after cleaning
+        try {
+          localStorage.setItem(key, value);
+          return true;
+        } catch (e) {
+          showNotification('❌ Storage is still full. Please clear some data manually.', 'error');
+          return false;
+        }
+      }
+      console.error('Storage error:', error);
+      return false;
+    }
+  };
+
+  // ==================== FETCH FROM GOOGLE SHEETS ====================
   const handleFetchFromSheets = async () => {
     if (isSyncing) return;
     
+    const result = await Swal.fire({
+      title: '📥 Fetch from Google Sheets?',
+      text: 'This will download all cloud data and overwrite your local data. Are you sure?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, fetch data!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
     setIsSyncing(true);
     showNotification('📥 Fetching data from Google Sheets...', 'info');
 
@@ -206,70 +313,95 @@ const App = () => {
       }
 
       if (!json.data || !json.data.expenses || json.data.expenses.length === 0) {
-        showNotification('📭 No cloud data found.', 'warning');
+        await Swal.fire({
+          icon: 'info',
+          title: '📭 No Cloud Data',
+          text: 'No expenses found in Google Sheets.',
+          confirmButtonColor: '#3085d6'
+        });
         setIsSyncing(false);
         return;
       }
 
       const { summary, expenses: sheetExpenses, fundHistory: sheetFundHistory } = json.data;
 
-      // Process expenses
       let processedExpenses = [];
       if (Array.isArray(sheetExpenses) && sheetExpenses.length > 0) {
-        processedExpenses = sheetExpenses.map((expense) => ({
+        // Limit to 50 items to avoid storage issues
+        const limited = sheetExpenses.slice(0, 50);
+        processedExpenses = limited.map((expense) => ({
           ...expense,
           id: expense.id || Date.now() + Math.random(),
           date: normalizeExpenseDate(expense.date),
           amount: Number(expense.amount) || 0,
-          expenseType: expense.expenseType || 'regular'
+          expenseType: expense.expenseType || 'regular',
+          imageUrl: expense.imageUrl || null,
+          imageBase64: expense.imageBase64 || null
         }));
       }
 
-      // Process fund history
       let processedFundHistory = [];
       if (Array.isArray(sheetFundHistory) && sheetFundHistory.length > 0) {
-        processedFundHistory = sheetFundHistory.map((item) => ({
+        const limited = sheetFundHistory.slice(0, 50);
+        processedFundHistory = limited.map((item) => ({
           ...item,
           id: item.id || Date.now() + Math.random(),
           amount: Number(item.amount) || 0,
           date: item.date || new Date().toISOString(),
           runningTotal: Number(item.runningTotal) || 0,
-          type: item.type || (Number(item.amount) >= 0 ? 'credit' : 'debit')
+          type: item.type || (Number(item.amount) >= 0 ? 'credit' : 'debit'),
+          imageUrl: item.imageUrl || null,
+          imageBase64: item.imageBase64 || null
         }));
       }
 
-      // Update state with fetched data
+      // Safe set items
+      safeSetItem('expenses', JSON.stringify(processedExpenses));
       setExpenses(processedExpenses);
-      localStorage.setItem('expenses', JSON.stringify(processedExpenses));
 
+      safeSetItem('fundHistory', JSON.stringify(processedFundHistory));
       setFundHistory(processedFundHistory);
-      localStorage.setItem('fundHistory', JSON.stringify(processedFundHistory));
 
-      // Update total funds
       let totalFundsFromSheet = 0;
       if (summary) {
         totalFundsFromSheet = Number(summary.totalFundsAdded) || 0;
       } else {
-        // Calculate from fund history
         totalFundsFromSheet = processedFundHistory
           .filter(item => item.type === 'credit')
           .reduce((sum, item) => sum + item.amount, 0);
       }
       setTotalFunds(totalFundsFromSheet);
-      localStorage.setItem('totalFunds', String(totalFundsFromSheet));
+      safeSetItem('totalFunds', String(totalFundsFromSheet));
 
       setLastUpdated(new Date().toLocaleTimeString());
+      const size = getStorageSize();
       setSystemMetrics(prev => ({ 
         ...prev, 
         totalTransactions: processedFundHistory.length,
         lastBackup: 'Just now',
-        syncStatus: 'online'
+        syncStatus: 'online',
+        storageUsed: `${size} MB`
       }));
+
+      await Swal.fire({
+        icon: 'success',
+        title: '✅ Fetch Successful!',
+        text: `Imported ${processedExpenses.length} expenses and ${processedFundHistory.length} transactions from Google Sheets.`,
+        confirmButtonColor: '#3085d6'
+      });
 
       showNotification(`✅ Data successfully imported from Google Sheets! (${processedExpenses.length} expenses)`, 'success');
       
     } catch (error) {
       console.error('Fetch from Sheets error:', error);
+      
+      await Swal.fire({
+        icon: 'error',
+        title: '❌ Fetch Failed',
+        text: error.message || 'Failed to fetch data from Google Sheets. Check your connection.',
+        confirmButtonColor: '#d33'
+      });
+      
       showNotification(`❌ Failed to fetch from Google Sheets: ${error.message || 'Unknown error'}`, 'error');
       setSystemMetrics(prev => ({ ...prev, syncStatus: 'offline' }));
     } finally {
@@ -277,14 +409,42 @@ const App = () => {
     }
   };
 
+  // ==================== PUSH TO GOOGLE SHEETS ====================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
     
+    const result = await Swal.fire({
+      title: '☁️ Push to Google Sheets?',
+      text: 'This will upload your local data to the cloud and overwrite existing cloud data. Are you sure?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, push data!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
     setIsSyncing(true);
     showNotification('🔄 Syncing with Google Sheets...', 'info');
 
     try {
       const totals = calculateTotals();
+      
+      const expensesWithImages = expenses.map(expense => ({
+        ...expense,
+        imageBase64: expense.imageBase64 || expense.imageUrl || null
+      }));
+
+      const fundHistoryWithImages = fundHistory.map(item => ({
+        ...item,
+        imageBase64: item.imageBase64 || item.imageUrl || null
+      }));
+
       const dataToSync = {
         totals: {
           totalFundsAdded: totals.totalFundsAdded,
@@ -296,8 +456,8 @@ const App = () => {
           oneTimeExpensesTotal: totals.oneTimeExpensesTotal,
           billsTotal: totals.billsTotal
         },
-        expenses: expenses,
-        fundHistory: fundHistory,
+        expenses: expensesWithImages,
+        fundHistory: fundHistoryWithImages,
         systemMetrics: systemMetrics,
         lastUpdated: new Date().toISOString()
       };
@@ -314,15 +474,30 @@ const App = () => {
         body: JSON.stringify(dataToSync),
       });
 
+      await Swal.fire({
+        icon: 'success',
+        title: '✅ Sync Successful!',
+        text: `Uploaded ${expenses.length} expenses and ${fundHistory.length} transactions to Google Sheets.`,
+        confirmButtonColor: '#3085d6'
+      });
+
       setTimeout(() => {
         showNotification('✅ Data synced to Cloud!', 'success');
         setLastUpdated(new Date().toLocaleTimeString());
-        localStorage.setItem('lastSyncTime', new Date().toISOString());
+        safeSetItem('lastSyncTime', new Date().toISOString());
         setSystemMetrics(prev => ({ ...prev, lastBackup: 'Just now' }));
       }, 1000);
       
     } catch (error) {
       console.error('CRITICAL SYNC ERROR:', error);
+      
+      await Swal.fire({
+        icon: 'error',
+        title: '❌ Sync Failed',
+        text: error.message || 'Failed to sync with Google Sheets. Check your connection.',
+        confirmButtonColor: '#d33'
+      });
+      
       showNotification('❌ Sync failed! Check connection.', 'error');
       setSystemMetrics(prev => ({ ...prev, syncStatus: 'offline' }));
     } finally {
@@ -330,67 +505,82 @@ const App = () => {
     }
   };
 
-  // Manual-only sync function is available via handleSyncToSheets.
-  // Removed automatic snapshot syncing to ensure cloud sync only happens with user action.
-
-
   // ==================== AUTO-REFRESH FOR ADMIN ====================
   useEffect(() => {
     let interval;
     if (userType === 'admin' && autoRefresh) {
       interval = setInterval(() => {
-        const savedExpenses = JSON.parse(localStorage.getItem('expenses') || '[]');
-        const savedFundHistory = JSON.parse(localStorage.getItem('fundHistory') || '[]');
-        const savedTotalFunds = parseFloat(localStorage.getItem('totalFunds') || '0');
-        
-        setExpenses(savedExpenses);
-        setFundHistory(savedFundHistory);
-        setTotalFunds(savedTotalFunds);
-        setLastUpdated(new Date().toLocaleTimeString());
-        setSystemMetrics(prev => ({
-          ...prev,
-          totalTransactions: savedFundHistory.length,
-          activeUsers: 1
-        }));
-        
-        const refreshNotif = document.querySelector('.admin-refresh-indicator');
-        if (refreshNotif) {
-          refreshNotif.classList.add('active');
-          setTimeout(() => refreshNotif.classList.remove('active'), 1000);
+        try {
+          const savedExpenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+          const savedFundHistory = JSON.parse(localStorage.getItem('fundHistory') || '[]');
+          const savedTotalFunds = parseFloat(localStorage.getItem('totalFunds') || '0');
+          
+          setExpenses(savedExpenses);
+          setFundHistory(savedFundHistory);
+          setTotalFunds(savedTotalFunds);
+          setLastUpdated(new Date().toLocaleTimeString());
+          const size = getStorageSize();
+          setSystemMetrics(prev => ({
+            ...prev,
+            totalTransactions: savedFundHistory.length,
+            activeUsers: 1,
+            storageUsed: `${size} MB`
+          }));
+          
+          const refreshNotif = document.querySelector('.admin-refresh-indicator');
+          if (refreshNotif) {
+            refreshNotif.classList.add('active');
+            setTimeout(() => refreshNotif.classList.remove('active'), 1000);
+          }
+        } catch (e) {
+          console.error('Auto-refresh error:', e);
         }
       }, refreshInterval * 1000);
     }
     return () => clearInterval(interval);
   }, [userType, autoRefresh, refreshInterval]);
 
-  // ==================== LOCAL STORAGE SAVE ====================
+  // ==================== LOCAL STORAGE SAVE (SAFE) ====================
   useEffect(() => {
     if (isAuthenticated) {
-      localStorage.setItem('totalFunds', totalFunds.toString());
+      safeSetItem('totalFunds', totalFunds.toString());
       setLastUpdated(new Date().toLocaleTimeString());
+      const size = getStorageSize();
+      setSystemMetrics(prev => ({ ...prev, storageUsed: `${size} MB` }));
     }
   }, [totalFunds, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      localStorage.setItem('fundHistory', JSON.stringify(fundHistory));
+      safeSetItem('fundHistory', JSON.stringify(fundHistory));
       setLastUpdated(new Date().toLocaleTimeString());
-      setSystemMetrics(prev => ({ ...prev, totalTransactions: fundHistory.length }));
+      const size = getStorageSize();
+      setSystemMetrics(prev => ({ ...prev, totalTransactions: fundHistory.length, storageUsed: `${size} MB` }));
     }
   }, [fundHistory, isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      localStorage.setItem('expenses', JSON.stringify(expenses));
+      safeSetItem('expenses', JSON.stringify(expenses));
       setLastUpdated(new Date().toLocaleTimeString());
+      const size = getStorageSize();
+      setSystemMetrics(prev => ({ ...prev, storageUsed: `${size} MB` }));
     }
   }, [expenses, isAuthenticated]);
+
+  // ==================== CLEAN STORAGE ON MOUNT ====================
+  useEffect(() => {
+    if (isAuthenticated) {
+      cleanStorage();
+      const size = getStorageSize();
+      setSystemMetrics(prev => ({ ...prev, storageUsed: `${size} MB` }));
+    }
+  }, [isAuthenticated]);
 
   // ==================== UTILITY FUNCTIONS ====================
   const formatPKR = (amount) => {
     if (amount === undefined || amount === null) return 'Rs 0';
     
-    // If amount is negative, show with minus sign
     if (amount < 0) {
       return `-${new Intl.NumberFormat('en-PK', {
         style: 'currency',
@@ -476,43 +666,6 @@ const App = () => {
     };
   };
 
-  const calculateTotalsFromState = (expenseList, historyList, totalFundsValue) => {
-    const totalFundsAdded = historyList
-      .filter(item => item.type === 'credit')
-      .reduce((sum, item) => sum + (item.amount || 0), 0);
-
-    const totalExpenses = expenseList
-      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
-
-    const currentBalance = Number.isFinite(totalFundsValue) ? totalFundsValue - totalExpenses : totalFundsAdded - totalExpenses;
-
-    const regularExpensesTotal = expenseList
-      .filter(expense => expense.expenseType === 'regular')
-      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
-
-    const oneTimeExpensesTotal = expenseList
-      .filter(expense => expense.expenseType === 'one-time')
-      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
-
-    const billsTotal = expenseList
-      .filter(expense => expense.expenseType === 'bill')
-      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
-
-    const usedPercentage = totalFundsAdded > 0 ? (totalExpenses / totalFundsAdded) * 100 : 0;
-    const remainingPercentage = totalFundsAdded > 0 ? (currentBalance / totalFundsAdded) * 100 : 0;
-
-    return {
-      totalFundsAdded,
-      totalExpenses,
-      currentBalance,
-      usedPercentage: Math.min(usedPercentage, 100).toFixed(1),
-      remainingPercentage: Math.max(remainingPercentage, 0).toFixed(1),
-      regularExpensesTotal,
-      oneTimeExpensesTotal,
-      billsTotal
-    };
-  };
-
   const totals = calculateTotals();
 
   // ==================== CORE FUNCTIONS ====================
@@ -524,18 +677,24 @@ const App = () => {
 
   const verifyAndPurge = () => {
     if (passwordInput === 'umar123') {
-      // Correct password - proceed with purge
-      const clearedExpenses = [];
-      const clearedFundHistory = [];
-      setTotalFunds(0);
-      setFundHistory(clearedFundHistory);
-      setExpenses(clearedExpenses);
-      setShowPasswordModal(false);
-      setPasswordInput('');
-      showNotification('🗑️ All data cleared successfully!', 'success');
-      // Removed automatic cloud sync on purge. Use the manual Sync button when ready.
+      try {
+        const clearedExpenses = [];
+        const clearedFundHistory = [];
+        setTotalFunds(0);
+        setFundHistory(clearedFundHistory);
+        setExpenses(clearedExpenses);
+        safeSetItem('totalFunds', '0');
+        safeSetItem('fundHistory', JSON.stringify(clearedFundHistory));
+        safeSetItem('expenses', JSON.stringify(clearedExpenses));
+        setShowPasswordModal(false);
+        setPasswordInput('');
+        const size = getStorageSize();
+        setSystemMetrics(prev => ({ ...prev, storageUsed: `${size} MB` }));
+        showNotification('🗑️ All data cleared successfully!', 'success');
+      } catch (error) {
+        showNotification('❌ Error clearing data!', 'error');
+      }
     } else {
-      // Wrong password
       setPasswordError('❌ Incorrect password!');
     }
   };
@@ -546,6 +705,7 @@ const App = () => {
     setPasswordError('');
   };
 
+  // ==================== ADD FUNDS WITH IMAGE SUPPORT ====================
   const handleAddFunds = (fundData) => {
     const amount = typeof fundData === 'object' ? parseFloat(fundData.amount) : parseFloat(fundData);
     let description = typeof fundData === 'object' ? fundData.description : 'Funds Added';
@@ -561,7 +721,9 @@ const App = () => {
         description: description,
         date: new Date().toISOString(),
         runningTotal: totals.totalFundsAdded + amount,
-        type: 'credit'
+        type: 'credit',
+        imageBase64: fundData.imageBase64 || null,
+        imageUrl: fundData.imageUrl || null
       };
 
       const nextFundHistory = [newFundEntry, ...fundHistory];
@@ -571,11 +733,11 @@ const App = () => {
       setTotalFunds(nextTotalFunds);
       
       showNotification(`💰 Funds added: ${formatPKR(amount)}`, 'success');
-      // Removed automatic cloud sync; sync only when user clicks the Sync button.
     }
   };
 
-  const handleAddExpense = (expenseData) => {
+  // ==================== ADD EXPENSE WITH IMAGE SUPPORT (FIXED) ====================
+  const handleAddExpense = async (expenseData) => {
     if (!expenseData || !expenseData.amount) {
       showNotification('❌ Invalid expense data!', 'error');
       return false;
@@ -583,6 +745,27 @@ const App = () => {
 
     const amount = parseFloat(expenseData.amount);
     const expenseType = expenseData.expenseType || 'regular';
+
+    // Handle image upload - compress with higher compression
+    let imageBase64 = null;
+    if (expenseData.imageFile) {
+      try {
+        // Check storage before processing image
+        const currentSize = getStorageSize();
+        if (parseFloat(currentSize) > 4.0) {
+          showNotification('⚠️ Storage is full! Please sync and clear data first.', 'warning');
+          return false;
+        }
+        
+        // Compress with smaller size
+        imageBase64 = await compressImageToBase64(expenseData.imageFile, 200, 0.4);
+        showNotification('📸 Image compressed successfully!', 'info');
+      } catch (error) {
+        console.error('Image compression failed:', error);
+        showNotification(`⚠️ ${error.message || 'Image upload failed, proceeding without image'}`, 'warning');
+        imageBase64 = null;
+      }
+    }
 
     // Create new expense
     const newExpense = {
@@ -592,27 +775,28 @@ const App = () => {
       date: expenseData.date || new Date().toISOString().split('T')[0],
       category: expenseData.category || 'Other',
       expenseType: expenseType,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      imageBase64: imageBase64 || null,
+      imageUrl: expenseData.imageUrl || null
     };
 
-    // Add image if exists
-    if (expenseData.imageUrl) {
-      newExpense.imageUrl = expenseData.imageUrl;
-    }
-
-    // Add notes if exists
     if (expenseData.notes) {
       newExpense.notes = expenseData.notes;
       newExpense.description = `${expenseData.description} 📝 ${expenseData.notes}`;
     }
 
-    const nextExpenses = [newExpense, ...expenses];
+    // Limit expenses to 50 items
+    let nextExpenses = [newExpense, ...expenses];
+    if (nextExpenses.length > 50) {
+      nextExpenses = nextExpenses.slice(0, 50);
+      showNotification('⚠️ Only last 50 expenses kept to save storage', 'warning');
+    }
     setExpenses(nextExpenses);
     
-    // Calculate new running total (can go negative)
+    // Calculate new running total
     const newRunningTotal = totals.currentBalance - amount;
     
-    // Add to fund history
+    // Add to fund history with image
     const deductionEntry = {
       id: Date.now() + 1,
       amount: -amount,
@@ -621,15 +805,15 @@ const App = () => {
       runningTotal: newRunningTotal,
       type: 'debit',
       category: expenseData.category,
-      expenseType: expenseType
+      expenseType: expenseType,
+      imageBase64: imageBase64 || null,
+      imageUrl: expenseData.imageUrl || null
     };
     
-    // Add image to fund history if exists
-    if (expenseData.imageUrl) {
-      deductionEntry.imageUrl = expenseData.imageUrl;
+    let nextFundHistory = [deductionEntry, ...fundHistory];
+    if (nextFundHistory.length > 50) {
+      nextFundHistory = nextFundHistory.slice(0, 50);
     }
-    
-    const nextFundHistory = [deductionEntry, ...fundHistory];
     setFundHistory(nextFundHistory);
     
     const typeIcons = {
@@ -644,7 +828,6 @@ const App = () => {
       showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}`, 'success');
     }
 
-    // Removed automatic cloud sync on expense add. Use explicit sync only.
     return true;
   };
 
@@ -660,7 +843,6 @@ const App = () => {
       setFundHistory(nextFundHistory);
       
       showNotification('✅ Expense deleted! Funds returned.', 'info');
-      // Removed automatic cloud sync on delete.
     }
   };
 
@@ -675,7 +857,6 @@ const App = () => {
         const nextFundHistory = fundHistory.filter(h => h.id !== id);
         setFundHistory(nextFundHistory);
         showNotification('✅ Transaction deleted!', 'info');
-        // Removed automatic cloud sync on transaction delete.
         return;
       } else if (transactionToDelete.type === 'debit') {
         const expenseId = id - 1;
@@ -684,14 +865,12 @@ const App = () => {
         setExpenses(nextExpenses);
         setFundHistory(nextFundHistory);
         showNotification('✅ Transaction deleted!', 'info');
-        // Removed automatic cloud sync on transaction delete.
         return;
       }
 
       const nextFundHistory = fundHistory.filter(h => h.id !== id);
       setFundHistory(nextFundHistory);
       showNotification('✅ Transaction deleted!', 'info');
-      // Removed automatic cloud sync on transaction delete.
     }
   };
 
@@ -713,14 +892,12 @@ const App = () => {
         description: `Expense adjustment: ${updatedExpense.description}`,
         date: new Date().toISOString(),
         runningTotal: totals.currentBalance - amountDifference,
-        type: 'debit'
+        type: 'debit',
+        imageBase64: updatedExpense.imageBase64 || null
       };
       
       const nextFundHistory = [adjustmentEntry, ...fundHistory];
       setFundHistory(nextFundHistory);
-      // Removed automatic cloud sync on expense edit.
-    } else {
-      // Removed automatic cloud sync on expense edit.
     }
     
     showNotification('✏️ Expense updated!', 'success');
@@ -854,10 +1031,8 @@ const App = () => {
   if (userType === 'admin') {
     return (
       <div className="admin-dashboard-premium">
-        {/* Password Modal */}
         {showPasswordModal && <PasswordModal />}
 
-        {/* Admin Header */}
         <header className="admin-header-glass">
           <div className="header-left">
             <div className="logo-wrapper">
@@ -907,7 +1082,6 @@ const App = () => {
           </div>
         </header>
 
-        {/* Admin Navigation */}
         <nav className="admin-nav-modern">
           <button 
             className={`nav-btn ${adminView === 'dashboard' ? 'active' : ''}`}
@@ -946,9 +1120,7 @@ const App = () => {
           </button>
         </nav>
 
-        {/* Admin Content */}
         <main className="admin-content-area">
-          {/* KPI Cards */}
           <div className="kpi-cards-grid">
             <div className="kpi-card blue">
               <div className="card-icon">💰</div>
@@ -990,7 +1162,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* Expense Type Cards */}
           <div className="type-cards-row">
             <div className="type-card regular">
               <div className="type-header">
@@ -1024,7 +1195,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* Dynamic Content */}
           <div className="dynamic-panel">
             {adminView === 'dashboard' && (
               <div className="dashboard-panel">
@@ -1033,17 +1203,22 @@ const App = () => {
                     <span className="qa-icon">📊</span>
                     <span>Generate Report</span>
                   </button>
-                  <button className="quick-action" onClick={handleSyncToSheets} disabled={isSyncing}>
-                    <span className="qa-icon">{isSyncing ? '🔄' : '☁️'}</span>
-                    <span>{isSyncing ? 'Syncing...' : 'Push to Cloud'}</span>
-                  </button>
-                  <button className="quick-action" onClick={handleFetchFromSheets} disabled={isSyncing}>
-                    <span className="qa-icon">{isSyncing ? '🔄' : '📥'}</span>
-                    <span>{isSyncing ? 'Fetching...' : 'Fetch from Cloud'}</span>
-                  </button>
                   <button className="quick-action" onClick={() => setAdminView('audit')}>
                     <span className="qa-icon">🔍</span>
                     <span>View Audit</span>
+                  </button>
+                  <button className="quick-action" onClick={() => setAdminView('analytics')}>
+                    <span className="qa-icon">📈</span>
+                    <span>Analytics</span>
+                  </button>
+                  <button 
+                    className="quick-action" 
+                    onClick={handleFetchFromSheets} 
+                    disabled={isSyncing}
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }}
+                  >
+                    <span className="qa-icon">{isSyncing ? '🔄' : '📥'}</span>
+                    <span>{isSyncing ? 'Fetching...' : 'Fetch from Cloud'}</span>
                   </button>
                 </div>
 
@@ -1125,7 +1300,7 @@ const App = () => {
                             {formatPKR(item.runningTotal)}
                           </td>
                           <td>
-                            {item.imageUrl ? (
+                            {item.imageBase64 ? (
                               <button 
                                 className="receipt-btn"
                                 onClick={() => {
@@ -1134,7 +1309,7 @@ const App = () => {
                                   modal.innerHTML = `
                                     <div class="modal-content">
                                       <span class="close-btn">✕</span>
-                                      <img src="${item.imageUrl}" alt="Receipt" />
+                                      <img src="${item.imageBase64}" alt="Receipt" />
                                     </div>
                                   `;
                                   document.body.appendChild(modal);
@@ -1162,7 +1337,6 @@ const App = () => {
               <div className="settings-panel">
                 <h3>System Settings</h3>
                 <div className="settings-grid">
-                  {/* Auto-refresh Setting */}
                   <div className="setting-card">
                     <h4>Auto-refresh</h4>
                     <div className="setting-control">
@@ -1189,39 +1363,49 @@ const App = () => {
                     </select>
                   </div>
 
-                  {/* Data Management Setting - Updated with Fetch button */}
                   <div className="setting-card">
                     <h4>Data Management</h4>
-                    <div className="cloud-sync-group">
-                      <button onClick={handleSyncToSheets} className="setting-btn sync" disabled={isSyncing}>
-                        <span className="btn-icon">{isSyncing ? '🔄' : '☁️'}</span>
-                        <span className="btn-text">Push to Google Sheets</span>
-                      </button>
-                      <button onClick={handleFetchFromSheets} className="setting-btn fetch" disabled={isSyncing}>
-                        <span className="btn-icon">{isSyncing ? '🔄' : '📥'}</span>
-                        <span className="btn-text">Fetch from Google Sheets</span>
-                      </button>
-                    </div>
-                    <div className="setting-help-text">
-                      <small>Push saves local data to cloud • Fetch downloads cloud data to this device</small>
-                    </div>
-                    <button onClick={handleClearAll} className="setting-btn purge">
-                      <span className="btn-icon">🗑️</span>
-                      <span className="btn-text">Purge All Data</span>
+                    <button 
+                      onClick={handleFetchFromSheets} 
+                      className="setting-btn fetch" 
+                      disabled={isSyncing}
+                      style={{ 
+                        width: '100%', 
+                        background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                        color: 'white'
+                      }}
+                    >
+                      <span className="btn-icon">{isSyncing ? '🔄' : '📥'}</span>
+                      <span className="btn-text">{isSyncing ? 'Fetching...' : 'Fetch from Google Sheets'}</span>
                     </button>
-                    <button onClick={handleLogout} className="setting-btn logout">
-                      <span className="btn-icon">🚪</span>
-                      <span className="btn-text">Logout</span>
+                    <div className="setting-help-text">
+                      <small>Fetch downloads cloud data to this device</small>
+                      <br />
+                      <small style={{ color: '#10b981' }}>✅ Images are stored in Base64 format</small>
+                      <br />
+                      <small style={{ color: '#f59e0b' }}>⚠️ Storage: {systemMetrics.storageUsed} / ~5MB</small>
+                    </div>
+                    <button 
+                      onClick={cleanStorage} 
+                      className="setting-btn" 
+                      style={{ 
+                        width: '100%', 
+                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                        color: 'white',
+                        marginTop: '0.5rem'
+                      }}
+                    >
+                      <span className="btn-icon">🧹</span>
+                      <span className="btn-text">Clean Old Data</span>
                     </button>
                   </div>
 
-                  {/* System Info Setting */}
                   <div className="setting-card">
                     <h4>System Info</h4>
                     <div className="info-list">
                       <div className="info-item">
                         <span>Version:</span>
-                        <strong>v3.0.0 Enterprise</strong>
+                        <strong>v3.0.1 Enterprise</strong>
                       </div>
                       <div className="info-item">
                         <span>Storage:</span>
@@ -1243,7 +1427,6 @@ const App = () => {
           </div>
         </main>
 
-        {/* Notification */}
         {notification.show && (
           <div className={`admin-notification ${notification.type}`}>
             <span className="noti-icon">
@@ -1262,7 +1445,6 @@ const App = () => {
   // ==================== REGULAR USER VIEW ====================
   return (
     <div className="app">
-      {/* Password Modal for User */}
       {showPasswordModal && <PasswordModal />}
 
       <Navbar onPurge={handleClearAll} onLogout={handleLogout} onAttendance={() => setActiveTab(activeTab === 'attendance' ? 'expenses' : 'attendance')} activeTab={activeTab} onHome={() => setActiveTab('expenses')} />
@@ -1288,7 +1470,6 @@ const App = () => {
           <Attendance />
         ) : (
         <div className="dashboard-v11">
-          {/* Row 1: Summary Dashboard */}
           <section className="grid-full-v11 glass-card summary-section-v11">
             <Summary
               totals={displayTotals}
@@ -1298,7 +1479,6 @@ const App = () => {
             />
           </section>
 
-          {/* Row 2: Add Fund & Add Expense */}
           <section className="grid-half-v11 glass-card">
             <div className="section-header-v10">
               <h3><span>💰</span> Add Funds</h3>
@@ -1323,7 +1503,6 @@ const App = () => {
             />
           </section>
 
-          {/* Row 3: Expense History */}
           <section className="grid-full-v11 glass-card history-section-v11">
             <div className="section-header-v10">
               <div className="title-group-v11">
@@ -1358,7 +1537,6 @@ const App = () => {
             </div>
           </section>
 
-          {/* Row 4: Analytics & Console */}
           <section className="grid-sidebar-v11 glass-card">
             <div className="section-header-v10">
               <h3><span>📊</span> Analytics</h3>
@@ -1378,6 +1556,9 @@ const App = () => {
                   <div className="console-text-v13">
                     <h3>Command Console</h3>
                     <span className="status-badge-v13">System Status: Live & Ready</span>
+                    <span className="status-badge-v13" style={{ background: '#f59e0b', marginLeft: '8px' }}>
+                      Storage: {systemMetrics.storageUsed}
+                    </span>
                   </div>
                 </div>
                 <div className="console-stats-v13">
@@ -1451,13 +1632,13 @@ const App = () => {
                 </div>
                 <div className="footer-meta-v13">
                   <span>AES-256 Encrypted Sync</span>
-                  <span className="version-tag-v13">v3.0.0</span>
+                  <span className="version-tag-v13">v3.0.1</span>
                 </div>
               </div>
             </div>
           </section>
         </div>
-        )} {/* end attendance conditional */}
+        )}
       </main>
     </div>
   );
