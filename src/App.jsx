@@ -128,8 +128,7 @@ const App = () => {
   }, []);
 
   // ==================== GOOGLE SHEETS SYNC ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxmMN20nQn2QtEa1qRhtBRj0V-aeACJ0SxiOlLEmiK6hmINb2zgbARvswu2NXu2jtbU/exec';
-
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyCMPTlYXUZAuGpk91QNa0kyro9VXt_iBCe7mjvQNeB9uraG9Uo_Iq51jEvv9y0bSQa/exec';
   const normalizeExpenseDate = (value) => {
     if (!value) return new Date().toISOString().split('T')[0];
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -360,23 +359,13 @@ const App = () => {
       return;
     }
 
-    // Check for images
+    // Check for images (just for logging)
     let imageCountInState = 0;
     expenses.forEach((e) => {
       const hasImage = e.imageBase64 && e.imageBase64.length > 100;
       if (hasImage) imageCountInState++;
     });
     console.log('📸 Total images in local state:', imageCountInState);
-
-    if (imageCountInState === 0) {
-      await Swal.fire({
-        icon: 'warning',
-        title: '⚠️ No Images Found',
-        text: 'No images found in local data. Please add an expense with an image first.',
-        confirmButtonColor: '#3085d6'
-      });
-      return;
-    }
 
     const result = await Swal.fire({
       title: '☁️ Push to Google Sheets?',
@@ -443,7 +432,6 @@ const App = () => {
       const cleanUrl = GAS_URL.trim();
       console.log('📤 Sending to URL:', cleanUrl);
 
-      // ✅ FIXED: Use no-cors mode to avoid CORS error
       await fetch(cleanUrl, {
         method: 'POST',
         mode: 'no-cors',
@@ -456,7 +444,6 @@ const App = () => {
 
       console.log('✅ Sync request sent successfully!');
 
-      // ✅ Show success message since we can't read response in no-cors mode
       await Swal.fire({
         icon: 'success',
         title: '✅ Sync Successful!',
@@ -676,7 +663,7 @@ const App = () => {
     }
   };
 
-  // ==================== ADD EXPENSE WITH IMAGE ====================
+  // ==================== ADD EXPENSE WITH IMAGE (OPTIONAL) ====================
   const handleAddExpense = async (expenseData) => {
     console.log('========================================');
     console.log('🔍 ADDING NEW EXPENSE');
@@ -690,6 +677,7 @@ const App = () => {
     const amount = parseFloat(expenseData.amount);
     const expenseType = expenseData.expenseType || 'regular';
 
+    // ✅ IMAGE IS OPTIONAL - Process only if image file is provided
     let imageBase64 = null;
     if (expenseData.imageFile) {
       try {
@@ -703,13 +691,14 @@ const App = () => {
         showNotification('✅ Image compressed!', 'success');
       } catch (error) {
         console.error('❌ Image compression failed:', error);
-        showNotification(`⚠️ ${error.message || 'Image upload failed'}`, 'warning');
+        showNotification(`⚠️ ${error.message || 'Image upload failed, proceeding without image'}`, 'warning');
         imageBase64 = null;
       }
     } else {
-      console.log('ℹ️ No image file provided');
+      console.log('ℹ️ No image file provided - expense will be added without image');
     }
 
+    // Create expense - imageBase64 will be null if no image provided
     const newExpense = {
       id: Date.now(),
       description: expenseData.description || 'No description',
@@ -718,12 +707,12 @@ const App = () => {
       category: expenseData.category || 'Other',
       expenseType: expenseType,
       timestamp: Date.now(),
-      imageBase64: imageBase64,
+      imageBase64: imageBase64, // ← NULL if no image
       notes: expenseData.notes || ''
     };
 
     console.log('📝 Created new expense:');
-    console.log('- Has image:', imageBase64 ? 'YES (' + imageBase64.length + ' chars)' : 'NO');
+    console.log('- Has image:', imageBase64 ? 'YES (' + imageBase64.length + ' chars)' : 'NO (Optional)');
 
     let nextExpenses = [newExpense, ...expenses];
     if (nextExpenses.length > 15) {
@@ -741,7 +730,7 @@ const App = () => {
       type: 'debit',
       category: expenseData.category || 'Other',
       expenseType: expenseType,
-      imageBase64: imageBase64
+      imageBase64: imageBase64 // ← NULL if no image
     };
     
     let nextFundHistory = [deductionEntry, ...fundHistory];
@@ -760,6 +749,7 @@ const App = () => {
     showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}${hasImage}`, 'success');
     
     console.log('✅ Expense added successfully!');
+    console.log('========================================');
     return true;
   };
 
@@ -1147,7 +1137,7 @@ const App = () => {
                   <div className="setting-card">
                     <h4>System Info</h4>
                     <div className="info-list">
-                      <div className="info-item"><span>Version:</span><strong>v3.1.0</strong></div>
+                      <div className="info-item"><span>Version:</span><strong>v3.2.0</strong></div>
                       <div className="info-item"><span>Storage:</span><strong>{systemMetrics.storageUsed}</strong></div>
                       <div className="info-item"><span>Status:</span><strong className="status-online">● Online</strong></div>
                       <div className="info-item"><span>Images:</span><strong>{expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length}</strong></div>
@@ -1267,7 +1257,7 @@ const App = () => {
 
                 <div className="console-footer-v13">
                   <div className="data-flow-track-v13"><div className={`data-flow-particle-v13 ${isSyncing ? 'active' : ''}`}></div></div>
-                  <div className="footer-meta-v13"><span>v3.1.0</span></div>
+                  <div className="footer-meta-v13"><span>v3.2.0</span></div>
                 </div>
               </div>
             </section>
