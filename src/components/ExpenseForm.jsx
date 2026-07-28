@@ -9,7 +9,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
     'Food', 'Transport', 'Utilities', 'Marketing', 'Maintenance', 'Bills', 'Other'
   ];
 
-  // Expense types for tracking
   const expenseTypes = [
     { value: 'regular', label: 'Regular Expense', icon: '🔄', color: '#3b82f6' },
     { value: 'one-time', label: 'One-time Expense', icon: '⚡', color: '#8b5cf6' },
@@ -24,7 +23,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
     expenseType: '',
     selectionMode: 'none',
     notes: '',
-    image: null,
+    imageFile: null,
     imagePreview: null
   });
 
@@ -53,96 +52,132 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // ============ IMAGE HANDLING ============
   const handleImageChange = (e) => {
     const file = e.target.files[0];
+    console.log('📸 Image selected:', file ? file.name : 'No file');
+    
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+      if (file.size > 1 * 1024 * 1024) {
+        alert('❌ Image size should be less than 1MB');
+        e.target.value = '';
         return;
       }
 
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
+        alert('❌ Please select an image file');
+        e.target.value = '';
         return;
       }
 
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log('✅ Image loaded, preview created');
         setFormData(prev => ({
           ...prev,
-          image: file,
+          imageFile: file,
           imagePreview: reader.result
         }));
+      };
+      reader.onerror = () => {
+        console.error('❌ Failed to read image');
+        alert('❌ Failed to read image file');
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handleRemoveImage = () => {
+    console.log('🗑️ Image removed');
     setFormData(prev => ({
       ...prev,
-      image: null,
+      imageFile: null,
       imagePreview: null
     }));
-    document.getElementById('image-upload').value = '';
+    const fileInput = document.getElementById('image-upload');
+    if (fileInput) fileInput.value = '';
   };
 
+  // ============ FORM SUBMIT ============
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.description || !formData.amount) return;
+    console.log('📝 Form submitted');
+    console.log('📝 Form data:', {
+      description: formData.description,
+      amount: formData.amount,
+      category: formData.category,
+      expenseType: formData.expenseType,
+      selectionMode: formData.selectionMode,
+      hasImage: formData.imageFile ? 'Yes' : 'No',
+      imageName: formData.imageFile ? formData.imageFile.name : 'None'
+    });
+    
+    // VALIDATION
+    if (!formData.description || !formData.amount) {
+      alert('❌ Please fill in description and amount');
+      console.log('❌ Validation failed: Missing description or amount');
+      return;
+    }
     
     if (type === 'expense' && !formData.category && !formData.expenseType) {
-      alert('Please select either a Category or an Expense Type');
+      alert('❌ Please select either a Category or an Expense Type');
+      console.log('❌ Validation failed: No category or expense type selected');
       return;
     }
     
     setIsSubmitting(true);
     
-    await new Promise(resolve => setTimeout(resolve, 400));
-    
     try {
       const submitData = {
-        ...formData,
+        description: formData.description.trim(),
         amount: parseFloat(formData.amount),
-        id: Date.now(),
-        timestamp: new Date().toISOString()
+        date: formData.date,
+        category: formData.category || 'Other',
+        expenseType: formData.expenseType || 'regular',
+        notes: formData.notes || '',
+        imageFile: formData.imageFile,     // ← ACTUAL FILE
+        imagePreview: formData.imagePreview // ← PREVIEW URL
       };
 
-      if (formData.imagePreview) {
-        submitData.imageUrl = formData.imagePreview;
-      }
-
-      if (type === 'expense') {
-        if (formData.expenseType) {
-          submitData.expenseType = formData.expenseType;
-          submitData.category = formData.expenseType === 'regular' ? 'Regular Expense' :
-                                 formData.expenseType === 'one-time' ? 'One-time Expense' : 'Bill';
-        } else if (formData.category) {
-          submitData.expenseType = 'regular';
-          submitData.category = formData.category;
-        }
-      }
-
-      await onSubmit(submitData);
-      
-      setFormData({
-        description: '',
-        amount: '',
-        date: getTodayDate(),
-        category: '',
-        expenseType: '',
-        selectionMode: 'none',
-        notes: '',
-        image: null,
-        imagePreview: null
+      console.log('📤 Submitting data to parent:', {
+        description: submitData.description,
+        amount: submitData.amount,
+        category: submitData.category,
+        expenseType: submitData.expenseType,
+        hasImageFile: submitData.imageFile ? 'Yes' : 'No',
+        imageFileName: submitData.imageFile ? submitData.imageFile.name : 'None',
+        hasImagePreview: submitData.imagePreview ? 'Yes' : 'No'
       });
+
+      // CALL PARENT onSubmit
+      const result = await onSubmit(submitData);
+      console.log('✅ Parent onSubmit result:', result);
       
-      const fileInput = document.getElementById('image-upload');
-      if (fileInput) fileInput.value = '';
+      // Reset form on success
+      if (result !== false) {
+        console.log('🔄 Resetting form');
+        setFormData({
+          description: '',
+          amount: '',
+          date: getTodayDate(),
+          category: '',
+          expenseType: '',
+          selectionMode: 'none',
+          notes: '',
+          imageFile: null,
+          imagePreview: null
+        });
+        
+        const fileInput = document.getElementById('image-upload');
+        if (fileInput) fileInput.value = '';
+      } else {
+        console.log('❌ Parent returned false, not resetting form');
+      }
       
     } catch (error) {
-      console.error('Submit error:', error);
+      console.error('❌ Submit error:', error);
+      alert('❌ Failed to add expense. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -150,14 +185,13 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
 
   const isExpense = type === 'expense';
 
-  // Determine balance color class
   const balanceClass = currentBalance < 0 ? 'negative' : 'positive';
 
   return (
     <form className={`expense-form-v5 ${type}`} onSubmit={handleSubmit}>
       <div className="form-grid">
         <div className="form-group-v5">
-          <label>Description</label>
+          <label>Description *</label>
           <div className="input-wrapper">
             <span className="input-icon">📝</span>
             <input
@@ -172,7 +206,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
         </div>
 
         <div className="form-group-v5">
-          <label>Amount (PKR)</label>
+          <label>Amount (PKR) *</label>
           <div className="input-wrapper">
             <span className="input-icon">💰</span>
             <input
@@ -186,7 +220,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
           </div>
         </div>
 
-        {/* Image Upload Section - For Expenses Only */}
+        {/* ============ IMAGE UPLOAD SECTION ============ */}
         {isExpense && (
           <div className="form-group-v5 image-upload-group">
             <label>
@@ -207,14 +241,14 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
                   <div className="upload-placeholder">
                     <span className="upload-icon">📎</span>
                     <span>Click to upload image</span>
-                    <small>PNG, JPG, GIF up to 5MB</small>
+                    <small>PNG, JPG, WebP (Max 1MB)</small>
                   </div>
                 </label>
               ) : (
                 <div className="image-preview-container">
                   <img 
                     src={formData.imagePreview} 
-                    alt="Preview" 
+                    alt="Receipt preview" 
                     className="image-preview"
                   />
                   <button 
@@ -222,7 +256,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
                     className="remove-image-btn"
                     onClick={handleRemoveImage}
                   >
-                    ✕
+                    ✕ Remove
                   </button>
                 </div>
               )}
@@ -248,7 +282,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
 
         {isExpense && (
           <>
-            {/* Selection Mode Tabs */}
             <div className="selection-mode-tabs">
               <button
                 type="button"
@@ -268,7 +301,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
               </button>
             </div>
 
-            {/* Categories Grid */}
             {formData.selectionMode === 'category' && (
               <div className="categories-grid">
                 <label className="categories-label">Choose Category:</label>
@@ -287,7 +319,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
               </div>
             )}
 
-            {/* Expense Types Grid */}
             {formData.selectionMode === 'expenseType' && (
               <div className="expense-type-grid">
                 <label className="expense-type-label">Choose Expense Type:</label>
@@ -311,7 +342,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
               </div>
             )}
 
-            {/* Selected Info */}
             {formData.selectionMode !== 'none' && (
               <div className="selected-info">
                 {formData.category && (
@@ -355,7 +385,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
         disabled={isSubmitting || (isExpense && !formData.category && !formData.expenseType)}
       >
         {isSubmitting ? (
-          <span className="spinner"></span>
+          <span className="spinner">⏳</span>
         ) : (
           <>
             <span className="btn-icon-v5">{isExpense ? '💸' : '💰'}</span>
@@ -364,7 +394,6 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
         )}
       </button>
 
-      {/* Balance Display Below Button */}
       <div className={`balance-display ${balanceClass}`}>
         <span className="balance-label">Available Balance:</span>
         <span className="balance-amount">{formatPKR(currentBalance)}</span>

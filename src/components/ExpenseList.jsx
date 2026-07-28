@@ -52,32 +52,46 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
     setEditingId(null);
   };
 
-  // Fixed image modal function
-  const openImageModal = (imageUrl) => {
-    console.log('Opening image:', imageUrl.substring(0, 50) + '...'); // Debug
-    setSelectedImage(imageUrl);
+  // ============ IMAGE MODAL FUNCTIONS ============
+  const openImageModal = (imageData) => {
+    console.log('🔍 Opening image, data type:', typeof imageData);
+    console.log('🔍 Image data preview:', imageData ? imageData.substring(0, 50) + '...' : 'null');
+    
+    if (!imageData) {
+      console.warn('⚠️ No image data provided');
+      return;
+    }
+    
+    setSelectedImage(imageData);
     setIsModalOpen(true);
-    // Prevent body scrolling when modal is open
     document.body.style.overflow = 'hidden';
   };
 
   const closeImageModal = () => {
     setIsModalOpen(false);
     setSelectedImage(null);
-    // Restore body scrolling
     document.body.style.overflow = 'auto';
   };
 
-  // Handle image error
+  // ============ HANDLE IMAGE ERROR ============
   const handleImageError = (e) => {
-    console.error('Image failed to load');
+    console.error('❌ Image failed to load');
     e.target.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-        <rect width="200" height="200" fill="#f8fafc"/>
-        <text x="100" y="100" font-family="Arial" font-size="14" fill="#64748b" text-anchor="middle" dy=".3em">Image not available</text>
-        <text x="100" y="130" font-family="Arial" font-size="12" fill="#94a3b8" text-anchor="middle">📸</text>
+      <svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+        <rect width="300" height="300" fill="#f8fafc"/>
+        <text x="150" y="130" font-family="Arial" font-size="20" fill="#64748b" text-anchor="middle" dy=".3em">📸</text>
+        <text x="150" y="170" font-family="Arial" font-size="14" fill="#94a3b8" text-anchor="middle">Image not available</text>
       </svg>
     `);
+  };
+
+  // ============ CHECK IF IMAGE EXISTS ============
+  const hasImage = (expense) => {
+    return expense.imageBase64 || expense.imageUrl || expense.imagePreview;
+  };
+
+  const getImageData = (expense) => {
+    return expense.imageBase64 || expense.imageUrl || expense.imagePreview || null;
   };
 
   const formatDate = (dateString) => {
@@ -181,12 +195,12 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
                           </span>
                         </div>
                         
-                        {/* Fixed Image Column */}
+                        {/* ============ IMAGE COLUMN (FIXED) ============ */}
                         <div className="cell-image-v7">
-                          {expense.imageUrl ? (
+                          {hasImage(expense) ? (
                             <button 
                               className="view-receipt-btn"
-                              onClick={() => openImageModal(expense.imageUrl)}
+                              onClick={() => openImageModal(getImageData(expense))}
                               title="View Receipt"
                             >
                               <span className="receipt-icon">📸</span>
@@ -216,7 +230,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
         )}
       </div>
 
-      {/* Fixed Working Image Modal */}
+      {/* ============ IMAGE MODAL (FIXED) ============ */}
       {isModalOpen && selectedImage && (
         <div className="image-modal-overlay" onClick={closeImageModal}>
           <div className="image-modal-container" onClick={e => e.stopPropagation()}>
@@ -292,7 +306,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
                         </head>
                         <body>
                           <div class="container">
-                            <img src="${selectedImage}" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%22200%22%20viewBox%3D%220%200%20200%20200%22%3E%3Crect%20width%3D%22200%22%20height%3D%22200%22%20fill%3D%22%23f8fafc%22%2F%3E%3Ctext%20x%3D%22100%22%20y%3D%22100%22%20font-family%3D%22Arial%22%20font-size%3D%2214%22%20fill%3D%22%2364748b%22%20text-anchor%3D%22middle%22%20dy%3D%22.3em%22%3EImage%20not%20available%3C%2Ftext%3E%3C%2Fsvg%3E';" />
+                            <img src="${selectedImage}" onerror="this.onerror=null; this.innerHTML='Image not available';" />
                             <div class="footer">Receipt from Expense Management System</div>
                           </div>
                         </body>
