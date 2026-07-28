@@ -64,7 +64,7 @@ const FundHistory = ({ history, formatPKR, onDelete }) => {
                 </div>
                 <div className="log-values-v13">
                   <span className={`log-amount-v13 ${item.type}`}>
-                    {item.type === 'credit' ? '+' : '--'}{formatPKR(item.amount)}
+                    {item.type === 'credit' ? '+' : '-'}{formatPKR(Math.abs(item.amount))}
                   </span>
                   <span className="log-running-v12">
                     Bal: {formatPKR(item.runningTotal)}

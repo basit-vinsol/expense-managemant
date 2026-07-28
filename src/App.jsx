@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import Summary from './components/Summary';
 import ExpenseForm from './components/ExpenseForm';
@@ -82,6 +82,12 @@ const App = () => {
     syncStatus: 'online'
   });
 
+  // ==================== SUBMISSION LOCK ====================
+  const isSubmittingRef = useRef(false);
+
+  // ==================== GOOGLE SHEETS URL ====================
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwkYiN_q5uRiWbV1O1ie1VOsfOHmyJJ4904jmw52sE3EThmW2dr8QXv4Jo6ypG1kEXP/exec';
+
   // ==================== AUTHENTICATION HANDLERS ====================
   const handleLogin = () => {
     const sessionId = Date.now().toString();
@@ -127,9 +133,7 @@ const App = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // ==================== GOOGLE SHEETS SYNC ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycby17FzJ065vuqV9lC5xMKGKlsX-sog2aVJxRhhh86gvGeDwiUa-Lb0YusarKRdzFOLX/exec';
-
+  // ==================== DATE HELPER ====================
   const normalizeExpenseDate = (value) => {
     if (!value) return new Date().toISOString().split('T')[0];
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -148,11 +152,11 @@ const App = () => {
     return (total / 1024 / 1024).toFixed(2);
   };
 
-  // ==================== IMAGE COMPRESSION ====================
-  const compressImageToBase64 = (file) => {
+  // ==================== SAVE IMAGE TO LOCAL STORAGE ====================
+  const saveImageToLocal = (file) => {
     return new Promise((resolve, reject) => {
-      if (file.size > 1 * 1024 * 1024) {
-        reject(new Error('Image too large! Please use image under 1MB.'));
+      if (file.size > 10 * 1024 * 1024) {
+        reject(new Error('Image too large! Please use image under 10MB.'));
         return;
       }
 
@@ -166,7 +170,7 @@ const App = () => {
           let width = img.width;
           let height = img.height;
           
-          const maxWidth = 200;
+          const maxWidth = 800;
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
             width = maxWidth;
@@ -175,16 +179,48 @@ const App = () => {
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
           
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.3);
-          console.log('📸 Compressed image length:', compressedBase64.length);
-          resolve(compressedBase64);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          
+          const filename = `receipt_${Date.now()}.jpg`;
+          const path = `/images/${filename}`;
+          
+          const savedImages = JSON.parse(localStorage.getItem('savedImages') || '[]');
+          savedImages.push({
+            filename: filename,
+            path: path,
+            base64: compressedBase64,
+            timestamp: Date.now()
+          });
+          localStorage.setItem('savedImages', JSON.stringify(savedImages));
+          
+          console.log('📸 Image saved locally:', path);
+          console.log('📸 Size:', (compressedBase64.length / 1024).toFixed(2), 'KB');
+          
+          resolve({
+            path: path,
+            filename: filename,
+            base64: compressedBase64
+          });
         };
         img.onerror = () => reject(new Error('Failed to load image'));
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
     });
+  };
+
+  // ==================== GET IMAGE FROM LOCAL STORAGE ====================
+  const getImageFromLocal = (path) => {
+    try {
+      const savedImages = JSON.parse(localStorage.getItem('savedImages') || '[]');
+      const image = savedImages.find(img => img.path === path);
+      return image ? image.base64 : null;
+    } catch (e) {
+      return null;
+    }
   };
 
   // ==================== SAFE LOCALSTORAGE SET ====================
@@ -249,7 +285,7 @@ const App = () => {
     
     const result = await Swal.fire({
       title: '📥 Fetch from Google Sheets?',
-      text: 'This will download data from cloud and restore your data.',
+      text: 'This will download all data from cloud.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -278,21 +314,22 @@ const App = () => {
       console.log('📥 Fetched expenses:', sheetExpenses ? sheetExpenses.length : 0);
       console.log('📥 Fetched fundHistory:', sheetFundHistory ? sheetFundHistory.length : 0);
 
-      // Check if data exists in Google Sheets
       if (!sheetExpenses || sheetExpenses.length === 0) {
+        setExpenses([]);
+        setFundHistory([]);
+        setTotalFunds(0);
+        safeSetItem('expenses', JSON.stringify([]));
+        safeSetItem('fundHistory', JSON.stringify([]));
+        safeSetItem('totalFunds', '0');
+        
         await Swal.fire({
           icon: 'info',
           title: '📭 No Cloud Data',
-          text: 'No data found in Google Sheets. Please add some data first.',
+          text: 'Google Sheets is empty.',
           confirmButtonColor: '#3085d6'
         });
         setIsSyncing(false);
         return;
-      }
-      
-      if (sheetExpenses && sheetExpenses.length > 0) {
-        const imageCount = sheetExpenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
-        console.log('📸 Images in fetched data:', imageCount);
       }
 
       let processedExpenses = [];
@@ -303,7 +340,9 @@ const App = () => {
           date: normalizeExpenseDate(expense.date),
           amount: Number(expense.amount) || 0,
           expenseType: expense.expenseType || 'regular',
-          imageBase64: expense.imageBase64 || null
+          imagePath: expense.imagePath || null,
+          imageBase64: expense.imageBase64 || null,
+          imageUrl: expense.imageUrl || null
         }));
       }
 
@@ -316,7 +355,9 @@ const App = () => {
           date: item.date || new Date().toISOString(),
           runningTotal: Number(item.runningTotal) || 0,
           type: item.type || 'credit',
-          imageBase64: item.imageBase64 || null
+          imagePath: item.imagePath || null,
+          imageBase64: item.imageBase64 || null,
+          imageUrl: item.imageUrl || null
         }));
       }
 
@@ -335,11 +376,11 @@ const App = () => {
       setLastUpdated(new Date().toLocaleTimeString());
       updateStorageMetrics();
 
-      const imageCount2 = processedExpenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
+      const imageCount2 = processedExpenses.filter(e => e.imagePath || e.imageBase64 || e.imageUrl).length;
       await Swal.fire({
         icon: 'success',
         title: '✅ Fetch Successful!',
-        text: `Restored ${processedExpenses.length} expenses with ${imageCount2} images from cloud!`,
+        text: `Restored ${processedExpenses.length} expenses with ${imageCount2} images!`,
         confirmButtonColor: '#3085d6'
       });
 
@@ -358,44 +399,53 @@ const App = () => {
     }
   };
 
-  // ==================== PUSH TO GOOGLE SHEETS (ALWAYS WORKS) ====================
+  // ==================== PUSH TO GOOGLE SHEETS (FULL REPLACE) ====================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
     
-    // Always allow push - even if no data
-    const imageCountInState = expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
+    // ✅ Always allow push - even with zero data
+    const imageCountInState = expenses.filter(e => e.imagePath || e.imageBase64).length;
+    console.log('📸 Images to push:', imageCountInState);
+    console.log('📊 Total expenses to push:', expenses.length);
     
     const result = await Swal.fire({
       title: '☁️ Push to Google Sheets?',
-      text: `Upload ${expenses.length} expenses (${imageCountInState} with images) to cloud.`,
+      html: `This will <b>replace</b> all data in Google Sheets.<br>
+             <br>
+             📊 ${expenses.length} expenses<br>
+             📸 ${imageCountInState} images (paths in sheet)<br>
+             📝 ${fundHistory.length} transactions<br>
+             <br>
+             <span style="color:#ef4444;">⚠️ Existing cloud data will be replaced!</span>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
       cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, push!',
+      confirmButtonText: 'Yes, replace!',
       cancelButtonText: 'Cancel'
     });
 
     if (!result.isConfirmed) return;
 
     setIsSyncing(true);
-    showNotification('🔄 Uploading to Google Sheets...', 'info');
+    showNotification('🔄 Replacing Google Sheets data...', 'info');
 
     try {
       const totals = calculateTotals();
       
-      const expensesWithImages = expenses.map(e => ({
+      const expensesWithPaths = expenses.map(e => ({
         id: e.id || Date.now(),
         date: e.date || new Date().toISOString().split('T')[0],
         description: e.description || '',
         category: e.category || 'Other',
         amount: Number(e.amount) || 0,
         expenseType: e.expenseType || 'regular',
+        imagePath: e.imagePath || '',
         imageBase64: e.imageBase64 || null,
         notes: e.notes || ''
       }));
 
-      const fundHistoryWithImages = fundHistory.map(h => ({
+      const fundHistoryWithPaths = fundHistory.map(h => ({
         id: h.id || Date.now(),
         date: h.date || new Date().toISOString(),
         description: h.description || '',
@@ -404,25 +454,24 @@ const App = () => {
         runningTotal: Number(h.runningTotal) || 0,
         category: h.category || '',
         expenseType: h.expenseType || 'regular',
+        imagePath: h.imagePath || '',
         imageBase64: h.imageBase64 || null
       }));
 
-      const imageCountInPush = expensesWithImages.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
-      console.log('📸 Images in push data:', imageCountInPush);
-
       const dataToSync = {
+        action: 'replace', // ← REPLACE mode
         totals: {
-          totalFundsAdded: totals.totalFundsAdded,
-          totalExpenses: totals.totalExpenses,
-          currentBalance: totals.currentBalance,
-          usedPercentage: totals.usedPercentage,
-          remainingPercentage: totals.remainingPercentage,
-          regularExpensesTotal: totals.regularExpensesTotal,
-          oneTimeExpensesTotal: totals.oneTimeExpensesTotal,
-          billsTotal: totals.billsTotal
+          totalFundsAdded: totals.totalFundsAdded || 0,
+          totalExpenses: totals.totalExpenses || 0,
+          currentBalance: totals.currentBalance || 0,
+          usedPercentage: totals.usedPercentage || 0,
+          remainingPercentage: totals.remainingPercentage || 0,
+          regularExpensesTotal: totals.regularExpensesTotal || 0,
+          oneTimeExpensesTotal: totals.oneTimeExpensesTotal || 0,
+          billsTotal: totals.billsTotal || 0
         },
-        expenses: expensesWithImages,
-        fundHistory: fundHistoryWithImages,
+        expenses: expensesWithPaths,
+        fundHistory: fundHistoryWithPaths,
         systemMetrics: systemMetrics,
         lastUpdated: new Date().toISOString()
       };
@@ -434,30 +483,26 @@ const App = () => {
         method: 'POST',
         mode: 'no-cors',
         cache: 'no-cache',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSync),
       });
 
-      console.log('✅ Sync request sent successfully!');
-
       await Swal.fire({
         icon: 'success',
-        title: '✅ Sync Successful!',
-        text: `Uploaded ${expenses.length} expenses with ${imageCountInPush} images to cloud!`,
+        title: '✅ Push Successful!',
+        text: `Replaced Google Sheets with ${expenses.length} expenses and ${imageCountInState} images!`,
         confirmButtonColor: '#3085d6'
       });
 
       setLastUpdated(new Date().toLocaleTimeString());
-      showNotification(`✅ Data synced with ${imageCountInPush} images!`, 'success');
+      showNotification(`✅ Data replaced with ${imageCountInState} image paths!`, 'success');
       
     } catch (error) {
-      console.error('❌ Sync error:', error);
+      console.error('❌ Push error:', error);
       await Swal.fire({
         icon: 'error',
-        title: '❌ Sync Failed',
-        text: error.message || 'Failed to sync. Check your internet connection.',
+        title: '❌ Push Failed',
+        text: error.message || 'Failed to push.',
         confirmButtonColor: '#d33'
       });
     } finally {
@@ -514,7 +559,7 @@ const App = () => {
   useEffect(() => {
     if (isAuthenticated) {
       updateStorageMetrics();
-      const imageCount = expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
+      const imageCount = expenses.filter(e => e.imagePath || e.imageBase64).length;
       console.log('📸 Images in localStorage on load:', imageCount);
     }
   }, [isAuthenticated]);
@@ -609,13 +654,16 @@ const App = () => {
     setPasswordError('');
   };
 
-  // ==================== PURGE ONLY UI (Sheet Safe) ====================
+  // ==================== PURGE (ONLY UI) ====================
   const verifyAndPurge = async () => {
     if (passwordInput === 'umar123') {
       try {
         const result = await Swal.fire({
           title: '🧹 Purge UI Data?',
-          text: 'This will clear all data from UI (Local Storage) only. Your Google Sheets data will remain safe. Are you sure?',
+          html: `This will clear <b>ONLY</b> the UI/Local Storage.<br>
+                 <br>
+                 ✅ Google Sheets data will <b>remain safe</b>.<br>
+                 ✅ Images will <b>remain safe</b>.`,
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#d33',
@@ -630,12 +678,10 @@ const App = () => {
           return;
         }
 
-        // Clear only localStorage (UI data)
         setTotalFunds(0);
         setFundHistory([]);
         setExpenses([]);
         
-        // Clear localStorage
         localStorage.removeItem('totalFunds');
         localStorage.removeItem('fundHistory');
         localStorage.removeItem('expenses');
@@ -647,7 +693,7 @@ const App = () => {
         await Swal.fire({
           icon: 'success',
           title: '✅ UI Data Cleared!',
-          text: 'Local storage has been cleared. Your data is still safe in Google Sheets. Use "Fetch from Cloud" to restore.',
+          text: 'Local storage has been cleared. Your data is still safe in Google Sheets.',
           confirmButtonColor: '#3085d6'
         });
 
@@ -690,101 +736,133 @@ const App = () => {
         date: new Date().toISOString(),
         runningTotal: totals.totalFundsAdded + amount,
         type: 'credit',
+        imagePath: null,
         imageBase64: null
       };
 
-      setFundHistory([newFundEntry, ...fundHistory]);
-      setTotalFunds(totalFunds + amount);
+      setFundHistory(prev => [newFundEntry, ...prev]);
+      setTotalFunds(prev => prev + amount);
       showNotification(`💰 Funds added: ${formatPKR(amount)}`, 'success');
     }
   };
 
-  // ==================== ADD EXPENSE WITH IMAGE (OPTIONAL) ====================
+  // ==================== ADD EXPENSE WITH IMAGE ====================
   const handleAddExpense = async (expenseData) => {
-    console.log('========================================');
+    if (isSubmittingRef.current) {
+      console.warn('⚠️ Submission already in progress');
+      return false;
+    }
+
     console.log('🔍 ADDING NEW EXPENSE');
-    console.log('========================================');
 
     if (!expenseData || !expenseData.amount) {
       showNotification('❌ Invalid expense data!', 'error');
       return false;
     }
 
-    const amount = parseFloat(expenseData.amount);
-    const expenseType = expenseData.expenseType || 'regular';
+    isSubmittingRef.current = true;
 
-    let imageBase64 = null;
-    if (expenseData.imageFile) {
-      try {
-        console.log('📸 Processing image:', expenseData.imageFile.name);
-        showNotification('📸 Compressing image...', 'info');
-        
-        imageBase64 = await compressImageToBase64(expenseData.imageFile);
-        console.log('✅ Image compressed! Length:', imageBase64 ? imageBase64.length : 'null');
-        showNotification('✅ Image compressed!', 'success');
-      } catch (error) {
-        console.error('❌ Image compression failed:', error);
-        showNotification(`⚠️ ${error.message || 'Image upload failed'}`, 'warning');
-        imageBase64 = null;
+    try {
+      const amount = parseFloat(expenseData.amount);
+      const expenseType = expenseData.expenseType || 'regular';
+
+      let imagePath = null;
+      let imageBase64 = null;
+      
+      if (expenseData.imageFile) {
+        try {
+          console.log('📸 Processing image:', expenseData.imageFile.name);
+          showNotification('📸 Saving image...', 'info');
+          
+          const result = await saveImageToLocal(expenseData.imageFile);
+          imagePath = result.path;
+          imageBase64 = result.base64;
+          console.log('✅ Image saved locally:', imagePath);
+          showNotification('✅ Image saved!', 'success');
+        } catch (error) {
+          console.error('❌ Image save failed:', error);
+          showNotification('⚠️ Image save failed', 'warning');
+        }
       }
-    }
 
-    const newExpense = {
-      id: Date.now(),
-      description: expenseData.description || 'No description',
-      amount: amount,
-      date: expenseData.date || new Date().toISOString().split('T')[0],
-      category: expenseData.category || 'Other',
-      expenseType: expenseType,
-      timestamp: Date.now(),
-      imageBase64: imageBase64,
-      notes: expenseData.notes || ''
-    };
+      const newExpense = {
+        id: Date.now(),
+        description: expenseData.description || 'No description',
+        amount: amount,
+        date: expenseData.date || new Date().toISOString().split('T')[0],
+        category: expenseData.category || 'Other',
+        expenseType: expenseType,
+        timestamp: Date.now(),
+        imagePath: imagePath,
+        imageBase64: imageBase64,
+        notes: expenseData.notes || ''
+      };
 
-    let nextExpenses = [newExpense, ...expenses];
-    if (nextExpenses.length > 15) {
-      nextExpenses = nextExpenses.slice(0, 15);
-    }
-    setExpenses(nextExpenses);
+      console.log('📝 Created expense:', {
+        id: newExpense.id,
+        description: newExpense.description,
+        imagePath: imagePath
+      });
 
-    const newRunningTotal = totals.currentBalance - amount;
-    const deductionEntry = {
-      id: Date.now() + 1,
-      amount: -amount,
-      description: `${expenseType.toUpperCase()}: ${expenseData.description || 'No description'}`,
-      date: new Date().toISOString(),
-      runningTotal: newRunningTotal,
-      type: 'debit',
-      category: expenseData.category || 'Other',
-      expenseType: expenseType,
-      imageBase64: imageBase64
-    };
-    
-    let nextFundHistory = [deductionEntry, ...fundHistory];
-    if (nextFundHistory.length > 15) {
-      nextFundHistory = nextFundHistory.slice(0, 15);
+      setExpenses(prev => {
+        const exists = prev.some(e => e.id === newExpense.id);
+        if (exists) {
+          console.warn('⚠️ Expense already exists');
+          return prev;
+        }
+        return [newExpense, ...prev];
+      });
+
+      const newRunningTotal = totals.currentBalance - amount;
+      const deductionEntry = {
+        id: Date.now() + 1,
+        amount: -amount,
+        description: `${expenseType.toUpperCase()}: ${expenseData.description || 'No description'}`,
+        date: new Date().toISOString(),
+        runningTotal: newRunningTotal,
+        type: 'debit',
+        category: expenseData.category || 'Other',
+        expenseType: expenseType,
+        imagePath: imagePath,
+        imageBase64: imageBase64
+      };
+      
+      setFundHistory(prev => {
+        const exists = prev.some(e => e.id === deductionEntry.id);
+        if (exists) {
+          console.warn('⚠️ Transaction already exists');
+          return prev;
+        }
+        return [deductionEntry, ...prev];
+      });
+      
+      const typeIcons = {
+        'regular': '🔄',
+        'one-time': '⚡',
+        'bill': '📄'
+      };
+      
+      const hasImage = imagePath ? ' 📸' : '';
+      showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}${hasImage}`, 'success');
+      
+      console.log('✅ Expense added successfully!');
+      return true;
+
+    } catch (error) {
+      console.error('❌ Error:', error);
+      showNotification('❌ Error adding expense!', 'error');
+      return false;
+    } finally {
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 300);
     }
-    setFundHistory(nextFundHistory);
-    
-    const typeIcons = {
-      'regular': '🔄',
-      'one-time': '⚡',
-      'bill': '📄'
-    };
-    
-    const hasImage = imageBase64 ? ' 📸' : '';
-    showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}${hasImage}`, 'success');
-    
-    console.log('✅ Expense added successfully!');
-    return true;
   };
 
   const handleDeleteExpense = (id) => {
     if (window.confirm('🗑️ Delete this expense?')) {
-      const nextExpenses = expenses.filter(e => e.id !== id);
-      const nextFundHistory = fundHistory.filter(h => h.id !== id + 1);
-      setExpenses(nextExpenses);
-      setFundHistory(nextFundHistory);
+      setExpenses(prev => prev.filter(e => e.id !== id));
+      setFundHistory(prev => prev.filter(h => h.id !== id + 1));
       showNotification('✅ Expense deleted!', 'info');
     }
   };
@@ -795,23 +873,22 @@ const App = () => {
       if (!transactionToDelete) return;
 
       if (transactionToDelete.type === 'credit') {
-        setTotalFunds(totalFunds - transactionToDelete.amount);
-        setFundHistory(fundHistory.filter(h => h.id !== id));
+        setTotalFunds(prev => prev - transactionToDelete.amount);
+        setFundHistory(prev => prev.filter(h => h.id !== id));
         showNotification('✅ Transaction deleted!', 'info');
       } else {
         const expenseId = id - 1;
-        setExpenses(expenses.filter(e => e.id !== expenseId));
-        setFundHistory(fundHistory.filter(h => h.id !== id));
+        setExpenses(prev => prev.filter(e => e.id !== expenseId));
+        setFundHistory(prev => prev.filter(h => h.id !== id));
         showNotification('✅ Transaction deleted!', 'info');
       }
     }
   };
 
   const handleEditExpense = (id, updatedExpense) => {
-    const nextExpenses = expenses.map(expense =>
+    setExpenses(prev => prev.map(expense =>
       expense.id === id ? { ...expense, ...updatedExpense } : expense
-    );
-    setExpenses(nextExpenses);
+    ));
     showNotification('✏️ Expense updated!', 'success');
   };
 
@@ -865,7 +942,7 @@ const App = () => {
     return filtered;
   };
 
-  const filteredExpenses = getFilteredExpenses();
+  const filteredExpenses = getFilteredExpenses() || [];
 
   const calculateFilteredTotals = () => {
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -1099,19 +1176,25 @@ const App = () => {
                           <td className={item.type}>{item.type === 'credit' ? '+' : '-'}{formatPKR(Math.abs(item.amount))}</td>
                           <td className={item.runningTotal < 0 ? 'negative' : ''}>{formatPKR(item.runningTotal)}</td>
                           <td>
-                            {item.imageBase64 ? (
+                            {item.imagePath || item.imageBase64 ? (
                               <button className="receipt-btn" onClick={() => {
-                                const modal = document.createElement('div');
-                                modal.className = 'image-preview-modal';
-                                modal.innerHTML = `
-                                  <div class="modal-content">
-                                    <span class="close-btn">✕</span>
-                                    <img src="${item.imageBase64}" alt="Receipt" style="max-width:100%;max-height:80vh;border-radius:8px;" />
-                                  </div>
-                                `;
-                                document.body.appendChild(modal);
-                                modal.querySelector('.close-btn').onclick = () => modal.remove();
-                                modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+                                let imageSrc = item.imageBase64;
+                                if (!imageSrc && item.imagePath) {
+                                  imageSrc = getImageFromLocal(item.imagePath);
+                                }
+                                if (imageSrc) {
+                                  const modal = document.createElement('div');
+                                  modal.className = 'image-preview-modal';
+                                  modal.innerHTML = `
+                                    <div class="modal-content">
+                                      <span class="close-btn">✕</span>
+                                      <img src="${imageSrc}" alt="Receipt" style="max-width:100%;max-height:80vh;border-radius:8px;" />
+                                    </div>
+                                  `;
+                                  document.body.appendChild(modal);
+                                  modal.querySelector('.close-btn').onclick = () => modal.remove();
+                                  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+                                }
                               }}>
                                 📸 View
                               </button>
@@ -1148,11 +1231,13 @@ const App = () => {
                   <div className="setting-card">
                     <h4>Data Management</h4>
                     <div style={{ marginBottom: '0.5rem' }}>
-                      <small>Storage Used: <strong>{systemMetrics.storageUsed}</strong> / ~5MB</small>
+                      <small>Storage Used: <strong>{systemMetrics.storageUsed}</strong></small>
                       <br />
                       <small>Total Expenses: <strong>{expenses.length}</strong></small>
                       <br />
                       <small>Total Transactions: <strong>{fundHistory.length}</strong></small>
+                      <br />
+                      <small>Images: <strong>{expenses.filter(e => e.imagePath || e.imageBase64).length}</strong></small>
                     </div>
                     <button onClick={() => { emergencyCleanup(); showNotification('🧹 Storage cleaned!', 'success'); }} className="setting-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
                       <span className="btn-icon">🧹</span>
@@ -1167,10 +1252,10 @@ const App = () => {
                   <div className="setting-card">
                     <h4>System Info</h4>
                     <div className="info-list">
-                      <div className="info-item"><span>Version:</span><strong>v4.0.0</strong></div>
+                      <div className="info-item"><span>Version:</span><strong>v10.0.0</strong></div>
                       <div className="info-item"><span>Storage:</span><strong>{systemMetrics.storageUsed}</strong></div>
                       <div className="info-item"><span>Status:</span><strong className="status-online">● Online</strong></div>
-                      <div className="info-item"><span>Images:</span><strong>{expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length}</strong></div>
+                      <div className="info-item"><span>Images:</span><strong>{expenses.filter(e => e.imagePath || e.imageBase64).length}</strong></div>
                     </div>
                   </div>
                 </div>
@@ -1247,7 +1332,7 @@ const App = () => {
                     <div className="console-text-v13">
                       <h3>Command Console</h3>
                       <span className="status-badge-v13">System Live</span>
-                      <span className="status-badge-v13" style={{ background: '#f59e0b', marginLeft: '8px' }}>📸 {expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length} images</span>
+                      <span className="status-badge-v13" style={{ background: '#f59e0b', marginLeft: '8px' }}>📸 {expenses.filter(e => e.imagePath || e.imageBase64).length} images</span>
                       <span className="status-badge-v13" style={{ background: '#10b981', marginLeft: '8px' }}>💾 {systemMetrics.storageUsed}</span>
                     </div>
                   </div>
@@ -1263,7 +1348,7 @@ const App = () => {
                       <div className="action-stack-v13">
                         <button className={`console-btn-v13 sync-btn-v13 ${isSyncing ? 'active' : ''}`} onClick={handleSyncToSheets} disabled={isSyncing}>
                           <span className="btn-icon-v13">{isSyncing ? '🔄' : '☁️'}</span>
-                          <div className="btn-label-v13"><strong>Push to Cloud</strong><small>Upload data</small></div>
+                          <div className="btn-label-v13"><strong>Push to Cloud</strong><small>Replace data</small></div>
                         </button>
                         <button className={`console-btn-v13 fetch-btn-v13 ${isSyncing ? 'active' : ''}`} onClick={handleFetchFromSheets} disabled={isSyncing}>
                           <span className="btn-icon-v13">{isSyncing ? '🔄' : '📥'}</span>
@@ -1287,7 +1372,7 @@ const App = () => {
 
                 <div className="console-footer-v13">
                   <div className="data-flow-track-v13"><div className={`data-flow-particle-v13 ${isSyncing ? 'active' : ''}`}></div></div>
-                  <div className="footer-meta-v13"><span>v4.0.0</span></div>
+                  <div className="footer-meta-v13"><span>v10.0.0</span></div>
                 </div>
               </div>
             </section>

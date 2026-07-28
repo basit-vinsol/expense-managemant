@@ -58,8 +58,8 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
     console.log('📸 Image selected:', file ? file.name : 'No file');
     
     if (file) {
-      if (file.size > 1 * 1024 * 1024) {
-        alert('❌ Image size should be less than 1MB');
+      if (file.size > 10 * 1024 * 1024) {
+        alert('❌ Image size should be less than 10MB');
         e.target.value = '';
         return;
       }
@@ -241,7 +241,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
                   <div className="upload-placeholder">
                     <span className="upload-icon">📎</span>
                     <span>Click to upload image</span>
-                    <small>PNG, JPG, WebP (Max 1MB)</small>
+                    <small>PNG, JPG, WebP (Max 10MB)</small>
                   </div>
                 </label>
               ) : (
