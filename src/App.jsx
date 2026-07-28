@@ -128,7 +128,7 @@ const App = () => {
   }, []);
 
   // ==================== GOOGLE SHEETS SYNC ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbywDSsbMcXcQfE-bT2_jE5jaQjT-A5k1MNyXlbiLFqWrW2JoeuXVisO9v5HAsgDlvu-/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwqpE3dFfjrf4vFKFIozChWltJP0uobR71-LCARx-MQJkgYcs0vR6gaT8zhw_3JMR4S/exec';
 
   const normalizeExpenseDate = (value) => {
     if (!value) return new Date().toISOString().split('T')[0];
@@ -148,11 +148,11 @@ const App = () => {
     return (total / 1024 / 1024).toFixed(2);
   };
 
-  // ==================== IMAGE COMPRESSION ====================
+  // ==================== IMAGE COMPRESSION (HIGH QUALITY) ====================
   const compressImageToBase64 = (file) => {
     return new Promise((resolve, reject) => {
-      if (file.size > 1 * 1024 * 1024) {
-        reject(new Error('Image too large! Please use image under 1MB.'));
+      if (file.size > 5 * 1024 * 1024) {
+        reject(new Error('Image too large! Please use image under 5MB.'));
         return;
       }
 
@@ -166,7 +166,8 @@ const App = () => {
           let width = img.width;
           let height = img.height;
           
-          const maxWidth = 200;
+          // ✅ HIGH QUALITY - 800px max (better clarity)
+          const maxWidth = 800;
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
             width = maxWidth;
@@ -175,10 +176,16 @@ const App = () => {
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          
+          // ✅ High quality image rendering
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
           
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.3);
+          // ✅ HIGH QUALITY - 0.9 quality (90%)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.9);
           console.log('📸 Compressed image length:', compressedBase64.length);
+          console.log('📸 Image size in KB:', (compressedBase64.length / 1024).toFixed(2));
           resolve(compressedBase64);
         };
         img.onerror = () => reject(new Error('Failed to load image'));
@@ -249,7 +256,7 @@ const App = () => {
     
     const result = await Swal.fire({
       title: '📥 Fetch from Google Sheets?',
-      text: 'This will download data from cloud and restore your data.',
+      text: 'This will download data from cloud. Are you sure?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -278,12 +285,11 @@ const App = () => {
       console.log('📥 Fetched expenses:', sheetExpenses ? sheetExpenses.length : 0);
       console.log('📥 Fetched fundHistory:', sheetFundHistory ? sheetFundHistory.length : 0);
 
-      // Check if data exists in Google Sheets
       if (!sheetExpenses || sheetExpenses.length === 0) {
         await Swal.fire({
           icon: 'info',
           title: '📭 No Cloud Data',
-          text: 'No data found in Google Sheets. Please add some data first.',
+          text: 'No data found in Google Sheets.',
           confirmButtonColor: '#3085d6'
         });
         setIsSyncing(false);
@@ -339,7 +345,7 @@ const App = () => {
       await Swal.fire({
         icon: 'success',
         title: '✅ Fetch Successful!',
-        text: `Restored ${processedExpenses.length} expenses with ${imageCount2} images from cloud!`,
+        text: `Restored ${processedExpenses.length} expenses with ${imageCount2} images!`,
         confirmButtonColor: '#3085d6'
       });
 
@@ -358,11 +364,10 @@ const App = () => {
     }
   };
 
-  // ==================== PUSH TO GOOGLE SHEETS (ALWAYS WORKS) ====================
+  // ==================== PUSH TO GOOGLE SHEETS ====================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
     
-    // Always allow push - even if no data
     const imageCountInState = expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
     
     const result = await Swal.fire({
@@ -445,7 +450,7 @@ const App = () => {
       await Swal.fire({
         icon: 'success',
         title: '✅ Sync Successful!',
-        text: `Uploaded ${expenses.length} expenses with ${imageCountInPush} images to cloud!`,
+        text: `Uploaded ${expenses.length} expenses with ${imageCountInPush} images!`,
         confirmButtonColor: '#3085d6'
       });
 
@@ -609,13 +614,12 @@ const App = () => {
     setPasswordError('');
   };
 
-  // ==================== PURGE ONLY UI (Sheet Safe) ====================
   const verifyAndPurge = async () => {
     if (passwordInput === 'umar123') {
       try {
         const result = await Swal.fire({
           title: '🧹 Purge UI Data?',
-          text: 'This will clear all data from UI (Local Storage) only. Your Google Sheets data will remain safe. Are you sure?',
+          text: 'This will clear all data from UI (Local Storage) only. Your Google Sheets data will remain safe.',
           icon: 'warning',
           showCancelButton: true,
           confirmButtonColor: '#d33',
@@ -630,12 +634,10 @@ const App = () => {
           return;
         }
 
-        // Clear only localStorage (UI data)
         setTotalFunds(0);
         setFundHistory([]);
         setExpenses([]);
         
-        // Clear localStorage
         localStorage.removeItem('totalFunds');
         localStorage.removeItem('fundHistory');
         localStorage.removeItem('expenses');
@@ -647,7 +649,7 @@ const App = () => {
         await Swal.fire({
           icon: 'success',
           title: '✅ UI Data Cleared!',
-          text: 'Local storage has been cleared. Your data is still safe in Google Sheets. Use "Fetch from Cloud" to restore.',
+          text: 'Local storage has been cleared. Your data is still safe in Google Sheets.',
           confirmButtonColor: '#3085d6'
         });
 
@@ -699,7 +701,7 @@ const App = () => {
     }
   };
 
-  // ==================== ADD EXPENSE WITH IMAGE (OPTIONAL) ====================
+  // ==================== ADD EXPENSE WITH IMAGE ====================
   const handleAddExpense = async (expenseData) => {
     console.log('========================================');
     console.log('🔍 ADDING NEW EXPENSE');
@@ -717,10 +719,13 @@ const App = () => {
     if (expenseData.imageFile) {
       try {
         console.log('📸 Processing image:', expenseData.imageFile.name);
+        console.log('📸 File size:', (expenseData.imageFile.size / 1024).toFixed(2), 'KB');
         showNotification('📸 Compressing image...', 'info');
         
         imageBase64 = await compressImageToBase64(expenseData.imageFile);
         console.log('✅ Image compressed! Length:', imageBase64 ? imageBase64.length : 'null');
+        console.log('📸 Image size in KB:', imageBase64 ? (imageBase64.length / 1024).toFixed(2) : '0');
+        
         showNotification('✅ Image compressed!', 'success');
       } catch (error) {
         console.error('❌ Image compression failed:', error);
@@ -1167,7 +1172,7 @@ const App = () => {
                   <div className="setting-card">
                     <h4>System Info</h4>
                     <div className="info-list">
-                      <div className="info-item"><span>Version:</span><strong>v4.0.0</strong></div>
+                      <div className="info-item"><span>Version:</span><strong>v4.1.0</strong></div>
                       <div className="info-item"><span>Storage:</span><strong>{systemMetrics.storageUsed}</strong></div>
                       <div className="info-item"><span>Status:</span><strong className="status-online">● Online</strong></div>
                       <div className="info-item"><span>Images:</span><strong>{expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length}</strong></div>
@@ -1287,7 +1292,7 @@ const App = () => {
 
                 <div className="console-footer-v13">
                   <div className="data-flow-track-v13"><div className={`data-flow-particle-v13 ${isSyncing ? 'active' : ''}`}></div></div>
-                  <div className="footer-meta-v13"><span>v4.0.0</span></div>
+                  <div className="footer-meta-v13"><span>v4.1.0</span></div>
                 </div>
               </div>
             </section>

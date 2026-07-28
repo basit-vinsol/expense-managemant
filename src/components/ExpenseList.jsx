@@ -6,6 +6,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
   const [editForm, setEditForm] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const categories = [
     'One-time Expense', 'Regular Expense', 'Office Stationery', 'Employee Stuff', 
@@ -52,10 +53,9 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
     setEditingId(null);
   };
 
-  // ============ IMAGE MODAL FUNCTIONS ============
+  // ============ IMAGE MODAL WITH ZOOM ============
   const openImageModal = (imageData) => {
-    console.log('🔍 Opening image, data type:', typeof imageData);
-    console.log('🔍 Image data preview:', imageData ? imageData.substring(0, 50) + '...' : 'null');
+    console.log('🔍 Opening image');
     
     if (!imageData) {
       console.warn('⚠️ No image data provided');
@@ -63,6 +63,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
     }
     
     setSelectedImage(imageData);
+    setZoomLevel(1);
     setIsModalOpen(true);
     document.body.style.overflow = 'hidden';
   };
@@ -70,7 +71,31 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
   const closeImageModal = () => {
     setIsModalOpen(false);
     setSelectedImage(null);
+    setZoomLevel(1);
     document.body.style.overflow = 'auto';
+  };
+
+  // ============ ZOOM CONTROLS ============
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(1);
+  };
+
+  // ============ MOUSE WHEEL ZOOM ============
+  const handleWheel = (e) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      setZoomLevel(prev => Math.min(prev + 0.1, 3));
+    } else {
+      setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+    }
   };
 
   // ============ HANDLE IMAGE ERROR ============
@@ -195,13 +220,13 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
                           </span>
                         </div>
                         
-                        {/* ============ IMAGE COLUMN (FIXED) ============ */}
+                        {/* ============ IMAGE COLUMN ============ */}
                         <div className="cell-image-v7">
                           {hasImage(expense) ? (
                             <button 
                               className="view-receipt-btn"
                               onClick={() => openImageModal(getImageData(expense))}
-                              title="View Receipt"
+                              title="View Receipt (Click to zoom)"
                             >
                               <span className="receipt-icon">📸</span>
                               <span className="receipt-label">Receipt</span>
@@ -230,106 +255,154 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
         )}
       </div>
 
-      {/* ============ IMAGE MODAL (FIXED) ============ */}
+      {/* ============ IMAGE MODAL WITH ZOOM ============ */}
       {isModalOpen && selectedImage && (
         <div className="image-modal-overlay" onClick={closeImageModal}>
           <div className="image-modal-container" onClick={e => e.stopPropagation()}>
+            {/* Header with Zoom Indicator */}
             <div className="image-modal-header">
               <h3>
                 <span className="header-icon">📸</span>
                 Receipt Image
+                <span className="zoom-indicator">Zoom: {Math.round(zoomLevel * 100)}%</span>
               </h3>
               <button className="image-modal-close-btn" onClick={closeImageModal}>
                 <span>✕</span>
               </button>
             </div>
-            <div className="image-modal-body">
-              <img 
-                src={selectedImage} 
-                alt="Receipt" 
-                className="image-modal-img"
-                onError={handleImageError}
-                loading="lazy"
-              />
+
+            {/* Image Body with Wheel Zoom */}
+            <div 
+              className="image-modal-body"
+              onWheel={handleWheel}
+            >
+              <div className="image-zoom-wrapper">
+                <img 
+                  src={selectedImage} 
+                  alt="Receipt" 
+                  className="image-modal-img"
+                  style={{ 
+                    transform: `scale(${zoomLevel})`,
+                    transition: 'transform 0.2s ease'
+                  }}
+                  onError={handleImageError}
+                  loading="lazy"
+                  draggable={false}
+                />
+              </div>
+              <div className="zoom-hint">
+                <span>🖱️ Scroll to zoom</span>
+              </div>
             </div>
+
+            {/* Zoom Controls Footer */}
             <div className="image-modal-footer">
-              <button 
-                className="image-modal-btn download"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = selectedImage;
-                  link.download = `receipt-${Date.now()}.jpg`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
-              >
-                <span>📥</span>
-                Download
-              </button>
-              <button 
-                className="image-modal-btn print"
-                onClick={() => {
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                    printWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>Receipt</title>
-                          <style>
-                            body { 
-                              display: flex; 
-                              justify-content: center; 
-                              align-items: center; 
-                              min-height: 100vh; 
-                              margin: 0; 
-                              background: #f5f5f5;
-                              font-family: Arial, sans-serif;
-                            }
-                            .container {
-                              text-align: center;
-                              padding: 20px;
-                            }
-                            img { 
-                              max-width: 90vw; 
-                              max-height: 90vh; 
-                              object-fit: contain;
-                              box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                              border-radius: 8px;
-                            }
-                            .footer {
-                              margin-top: 20px;
-                              color: #666;
-                              font-size: 12px;
-                            }
-                          </style>
-                        </head>
-                        <body>
-                          <div class="container">
-                            <img src="${selectedImage}" onerror="this.onerror=null; this.innerHTML='Image not available';" />
-                            <div class="footer">Receipt from Expense Management System</div>
-                          </div>
-                        </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    setTimeout(() => {
-                      printWindow.print();
-                    }, 500);
-                  }
-                }}
-              >
-                <span>🖨️</span>
-                Print
-              </button>
-              <button 
-                className="image-modal-btn close"
-                onClick={closeImageModal}
-              >
-                <span>✕</span>
-                Close
-              </button>
+              <div className="zoom-controls">
+                <button 
+                  className="image-modal-btn zoom-btn"
+                  onClick={handleZoomOut}
+                  title="Zoom Out"
+                >
+                  <span>🔍</span>
+                  <span>−</span>
+                </button>
+                <span className="zoom-level-text">{Math.round(zoomLevel * 100)}%</span>
+                <button 
+                  className="image-modal-btn zoom-btn"
+                  onClick={handleZoomIn}
+                  title="Zoom In"
+                >
+                  <span>🔍</span>
+                  <span>+</span>
+                </button>
+                <button 
+                  className="image-modal-btn reset-btn"
+                  onClick={handleZoomReset}
+                  title="Reset Zoom"
+                >
+                  <span>⟳</span>
+                  <span>Reset</span>
+                </button>
+              </div>
+              <div className="modal-actions">
+                <button 
+                  className="image-modal-btn download"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = selectedImage;
+                    link.download = `receipt-${Date.now()}.jpg`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                >
+                  <span>📥</span>
+                  Download
+                </button>
+                <button 
+                  className="image-modal-btn print"
+                  onClick={() => {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write(`
+                        <html>
+                          <head>
+                            <title>Receipt</title>
+                            <style>
+                              body { 
+                                display: flex; 
+                                justify-content: center; 
+                                align-items: center; 
+                                min-height: 100vh; 
+                                margin: 0; 
+                                background: #f5f5f5;
+                                font-family: Arial, sans-serif;
+                              }
+                              .container {
+                                text-align: center;
+                                padding: 20px;
+                              }
+                              img { 
+                                max-width: 90vw; 
+                                max-height: 90vh; 
+                                object-fit: contain;
+                                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                                border-radius: 8px;
+                              }
+                              .footer {
+                                margin-top: 20px;
+                                color: #666;
+                                font-size: 12px;
+                              }
+                            </style>
+                          </head>
+                          <body>
+                            <div class="container">
+                              <img src="${selectedImage}" onerror="this.onerror=null; this.innerHTML='Image not available';" />
+                              <div class="footer">Receipt from Expense Management System</div>
+                            </div>
+                          </body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      printWindow.focus();
+                      setTimeout(() => {
+                        printWindow.print();
+                      }, 500);
+                    }
+                  }}
+                >
+                  <span>🖨️</span>
+                  Print
+                </button>
+                <button 
+                  className="image-modal-btn close"
+                  onClick={closeImageModal}
+                >
+                  <span>✕</span>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
