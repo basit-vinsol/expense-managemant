@@ -128,7 +128,8 @@ const App = () => {
   }, []);
 
   // ==================== GOOGLE SHEETS SYNC ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyCMPTlYXUZAuGpk91QNa0kyro9VXt_iBCe7mjvQNeB9uraG9Uo_Iq51jEvv9y0bSQa/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbywDSsbMcXcQfE-bT2_jE5jaQjT-A5k1MNyXlbiLFqWrW2JoeuXVisO9v5HAsgDlvu-/exec';
+
   const normalizeExpenseDate = (value) => {
     if (!value) return new Date().toISOString().split('T')[0];
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -248,7 +249,7 @@ const App = () => {
     
     const result = await Swal.fire({
       title: '📥 Fetch from Google Sheets?',
-      text: 'This will download data from cloud. Are you sure?',
+      text: 'This will download data from cloud and restore your data.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#3085d6',
@@ -276,6 +277,18 @@ const App = () => {
 
       console.log('📥 Fetched expenses:', sheetExpenses ? sheetExpenses.length : 0);
       console.log('📥 Fetched fundHistory:', sheetFundHistory ? sheetFundHistory.length : 0);
+
+      // Check if data exists in Google Sheets
+      if (!sheetExpenses || sheetExpenses.length === 0) {
+        await Swal.fire({
+          icon: 'info',
+          title: '📭 No Cloud Data',
+          text: 'No data found in Google Sheets. Please add some data first.',
+          confirmButtonColor: '#3085d6'
+        });
+        setIsSyncing(false);
+        return;
+      }
       
       if (sheetExpenses && sheetExpenses.length > 0) {
         const imageCount = sheetExpenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
@@ -326,11 +339,11 @@ const App = () => {
       await Swal.fire({
         icon: 'success',
         title: '✅ Fetch Successful!',
-        text: `Imported ${processedExpenses.length} expenses with ${imageCount2} images!`,
+        text: `Restored ${processedExpenses.length} expenses with ${imageCount2} images from cloud!`,
         confirmButtonColor: '#3085d6'
       });
 
-      showNotification(`✅ Data fetched successfully!`, 'success');
+      showNotification(`✅ Data restored from cloud successfully!`, 'success');
       
     } catch (error) {
       console.error('Fetch error:', error);
@@ -345,28 +358,13 @@ const App = () => {
     }
   };
 
-  // ==================== PUSH TO GOOGLE SHEETS (CORS FIXED) ====================
+  // ==================== PUSH TO GOOGLE SHEETS (ALWAYS WORKS) ====================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
     
-    if (expenses.length === 0 && fundHistory.length === 0) {
-      await Swal.fire({
-        icon: 'info',
-        title: '📭 No Data',
-        text: 'No expenses or transactions to sync.',
-        confirmButtonColor: '#3085d6'
-      });
-      return;
-    }
-
-    // Check for images (just for logging)
-    let imageCountInState = 0;
-    expenses.forEach((e) => {
-      const hasImage = e.imageBase64 && e.imageBase64.length > 100;
-      if (hasImage) imageCountInState++;
-    });
-    console.log('📸 Total images in local state:', imageCountInState);
-
+    // Always allow push - even if no data
+    const imageCountInState = expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length;
+    
     const result = await Swal.fire({
       title: '☁️ Push to Google Sheets?',
       text: `Upload ${expenses.length} expenses (${imageCountInState} with images) to cloud.`,
@@ -447,7 +445,7 @@ const App = () => {
       await Swal.fire({
         icon: 'success',
         title: '✅ Sync Successful!',
-        text: `Uploaded ${expenses.length} expenses with ${imageCountInPush} images!`,
+        text: `Uploaded ${expenses.length} expenses with ${imageCountInPush} images to cloud!`,
         confirmButtonColor: '#3085d6'
       });
 
@@ -611,20 +609,58 @@ const App = () => {
     setPasswordError('');
   };
 
-  const verifyAndPurge = () => {
+  // ==================== PURGE ONLY UI (Sheet Safe) ====================
+  const verifyAndPurge = async () => {
     if (passwordInput === 'umar123') {
       try {
+        const result = await Swal.fire({
+          title: '🧹 Purge UI Data?',
+          text: 'This will clear all data from UI (Local Storage) only. Your Google Sheets data will remain safe. Are you sure?',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Yes, clear UI!',
+          cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) {
+          setShowPasswordModal(false);
+          setPasswordInput('');
+          return;
+        }
+
+        // Clear only localStorage (UI data)
         setTotalFunds(0);
         setFundHistory([]);
         setExpenses([]);
-        localStorage.clear();
+        
+        // Clear localStorage
+        localStorage.removeItem('totalFunds');
+        localStorage.removeItem('fundHistory');
+        localStorage.removeItem('expenses');
+        
         setShowPasswordModal(false);
         setPasswordInput('');
         updateStorageMetrics();
-        showNotification('🗑️ All data cleared!', 'success');
-        window.location.reload();
+        
+        await Swal.fire({
+          icon: 'success',
+          title: '✅ UI Data Cleared!',
+          text: 'Local storage has been cleared. Your data is still safe in Google Sheets. Use "Fetch from Cloud" to restore.',
+          confirmButtonColor: '#3085d6'
+        });
+
+        showNotification('🧹 UI data cleared! Sheet data is safe.', 'success');
+        
       } catch (error) {
-        showNotification('❌ Error clearing data!', 'error');
+        console.error('Purge error:', error);
+        await Swal.fire({
+          icon: 'error',
+          title: '❌ Error',
+          text: 'Failed to clear data. Please try again.',
+          confirmButtonColor: '#d33'
+        });
       }
     } else {
       setPasswordError('❌ Incorrect password!');
@@ -677,28 +713,22 @@ const App = () => {
     const amount = parseFloat(expenseData.amount);
     const expenseType = expenseData.expenseType || 'regular';
 
-    // ✅ IMAGE IS OPTIONAL - Process only if image file is provided
     let imageBase64 = null;
     if (expenseData.imageFile) {
       try {
         console.log('📸 Processing image:', expenseData.imageFile.name);
-        console.log('📸 File size:', (expenseData.imageFile.size / 1024).toFixed(2), 'KB');
         showNotification('📸 Compressing image...', 'info');
         
         imageBase64 = await compressImageToBase64(expenseData.imageFile);
         console.log('✅ Image compressed! Length:', imageBase64 ? imageBase64.length : 'null');
-        
         showNotification('✅ Image compressed!', 'success');
       } catch (error) {
         console.error('❌ Image compression failed:', error);
-        showNotification(`⚠️ ${error.message || 'Image upload failed, proceeding without image'}`, 'warning');
+        showNotification(`⚠️ ${error.message || 'Image upload failed'}`, 'warning');
         imageBase64 = null;
       }
-    } else {
-      console.log('ℹ️ No image file provided - expense will be added without image');
     }
 
-    // Create expense - imageBase64 will be null if no image provided
     const newExpense = {
       id: Date.now(),
       description: expenseData.description || 'No description',
@@ -707,12 +737,9 @@ const App = () => {
       category: expenseData.category || 'Other',
       expenseType: expenseType,
       timestamp: Date.now(),
-      imageBase64: imageBase64, // ← NULL if no image
+      imageBase64: imageBase64,
       notes: expenseData.notes || ''
     };
-
-    console.log('📝 Created new expense:');
-    console.log('- Has image:', imageBase64 ? 'YES (' + imageBase64.length + ' chars)' : 'NO (Optional)');
 
     let nextExpenses = [newExpense, ...expenses];
     if (nextExpenses.length > 15) {
@@ -730,7 +757,7 @@ const App = () => {
       type: 'debit',
       category: expenseData.category || 'Other',
       expenseType: expenseType,
-      imageBase64: imageBase64 // ← NULL if no image
+      imageBase64: imageBase64
     };
     
     let nextFundHistory = [deductionEntry, ...fundHistory];
@@ -749,7 +776,6 @@ const App = () => {
     showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}${hasImage}`, 'success');
     
     console.log('✅ Expense added successfully!');
-    console.log('========================================');
     return true;
   };
 
@@ -877,7 +903,7 @@ const App = () => {
           <button className="modal-close" onClick={cancelPurge}>✕</button>
         </div>
         <div className="password-modal-body">
-          <p>Enter admin password to clear all data:</p>
+          <p>Enter admin password to clear UI data:</p>
           <input
             type="password"
             value={passwordInput}
@@ -1120,9 +1146,13 @@ const App = () => {
                   </div>
 
                   <div className="setting-card">
-                    <h4>Storage Management</h4>
+                    <h4>Data Management</h4>
                     <div style={{ marginBottom: '0.5rem' }}>
                       <small>Storage Used: <strong>{systemMetrics.storageUsed}</strong> / ~5MB</small>
+                      <br />
+                      <small>Total Expenses: <strong>{expenses.length}</strong></small>
+                      <br />
+                      <small>Total Transactions: <strong>{fundHistory.length}</strong></small>
                     </div>
                     <button onClick={() => { emergencyCleanup(); showNotification('🧹 Storage cleaned!', 'success'); }} className="setting-btn" style={{ width: '100%', background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
                       <span className="btn-icon">🧹</span>
@@ -1130,14 +1160,14 @@ const App = () => {
                     </button>
                     <button onClick={handleClearAll} className="setting-btn purge" style={{ width: '100%', marginTop: '0.5rem' }}>
                       <span className="btn-icon">💣</span>
-                      <span className="btn-text">Clear All Data</span>
+                      <span className="btn-text">Purge UI Data (Sheet Safe)</span>
                     </button>
                   </div>
 
                   <div className="setting-card">
                     <h4>System Info</h4>
                     <div className="info-list">
-                      <div className="info-item"><span>Version:</span><strong>v3.2.0</strong></div>
+                      <div className="info-item"><span>Version:</span><strong>v4.0.0</strong></div>
                       <div className="info-item"><span>Storage:</span><strong>{systemMetrics.storageUsed}</strong></div>
                       <div className="info-item"><span>Status:</span><strong className="status-online">● Online</strong></div>
                       <div className="info-item"><span>Images:</span><strong>{expenses.filter(e => e.imageBase64 && e.imageBase64.length > 100).length}</strong></div>
@@ -1237,7 +1267,7 @@ const App = () => {
                         </button>
                         <button className={`console-btn-v13 fetch-btn-v13 ${isSyncing ? 'active' : ''}`} onClick={handleFetchFromSheets} disabled={isSyncing}>
                           <span className="btn-icon-v13">{isSyncing ? '🔄' : '📥'}</span>
-                          <div className="btn-label-v13"><strong>Fetch from Cloud</strong><small>Download data</small></div>
+                          <div className="btn-label-v13"><strong>Fetch from Cloud</strong><small>Restore data</small></div>
                         </button>
                       </div>
                     </div>
@@ -1257,7 +1287,7 @@ const App = () => {
 
                 <div className="console-footer-v13">
                   <div className="data-flow-track-v13"><div className={`data-flow-particle-v13 ${isSyncing ? 'active' : ''}`}></div></div>
-                  <div className="footer-meta-v13"><span>v3.2.0</span></div>
+                  <div className="footer-meta-v13"><span>v4.0.0</span></div>
                 </div>
               </div>
             </section>
