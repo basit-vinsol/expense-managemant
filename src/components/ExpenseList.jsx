@@ -20,7 +20,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
     }
   };
 
-  // ==================== GET IMAGE SOURCE ====================
+  // ==================== GET IMAGE SOURCE (CORS FIXED) ====================
   const getImageSrc = (expense) => {
     // 1. Check if imageBase64 exists (direct)
     if (expense.imageBase64 && expense.imageBase64.length > 100) {
@@ -35,8 +35,24 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
       }
     }
     
-    // 3. Check if imageUrl exists (Drive URL)
+    // ============================================================
+    // 🔥 CRITICAL CORS FIX: Google Drive URL ko Thumbnail URL mein convert karo
+    // ============================================================
     if (expense.imageUrl && expense.imageUrl.startsWith('http')) {
+      // Agar URL Google Drive ka 'uc' link hai
+      if (expense.imageUrl.includes('drive.google.com/uc')) {
+        const fileId = expense.imageUrl.match(/id=([^&]+)/)?.[1];
+        if (fileId) {
+          // ✅ PERMANENT FIX: 'thumbnail' endpoint use karo. Yeh CORS bypass karta hai.
+          return `https://drive.google.com/thumbnail?sz=w1000&id=${fileId}`;
+        }
+      }
+      
+      // Agar pehle se safe domain hai (jaise thumbnail ya googleusercontent)
+      if (expense.imageUrl.includes('googleusercontent.com') || expense.imageUrl.includes('thumbnail')) {
+        return expense.imageUrl;
+      }
+      
       return expense.imageUrl;
     }
     
@@ -168,7 +184,6 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
   // ============ CHECK IF IMAGE EXISTS ============
   const hasImage = (expense) => {
     if (!expense) return false;
-    // console.log('Checking image for:', expense.description, expense.imageUrl);
     return !!(expense.imageBase64 || expense.imagePath || expense.imageUrl);
   };
 
