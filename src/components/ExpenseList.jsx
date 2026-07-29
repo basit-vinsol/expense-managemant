@@ -35,20 +35,20 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
       }
     }
     
-    // ============================================================
-    // 🔥 CRITICAL CORS FIX: Google Drive URL ko Thumbnail URL mein convert karo
-    // ============================================================
+    // 3. Check if imageUrl exists (Drive URL)
     if (expense.imageUrl && expense.imageUrl.startsWith('http')) {
-      // Agar URL Google Drive ka 'uc' link hai
+      
+      // 🔥 CRITICAL FIX: Agar URL Google Drive ka 'uc' link hai
       if (expense.imageUrl.includes('drive.google.com/uc')) {
         const fileId = expense.imageUrl.match(/id=([^&]+)/)?.[1];
         if (fileId) {
           // ✅ PERMANENT FIX: 'thumbnail' endpoint use karo. Yeh CORS bypass karta hai.
+          // Is URL par kisi bhi device se image load hogi
           return `https://drive.google.com/thumbnail?sz=w1000&id=${fileId}`;
         }
       }
       
-      // Agar pehle se safe domain hai (jaise thumbnail ya googleusercontent)
+      // Agar pehle se safe domain hai
       if (expense.imageUrl.includes('googleusercontent.com') || expense.imageUrl.includes('thumbnail')) {
         return expense.imageUrl;
       }
