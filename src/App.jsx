@@ -88,7 +88,7 @@ const App = () => {
   // ============================================================
   // GOOGLE SHEETS URL
   // ============================================================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxUK0pE165nqWwvDPlns-AnjIfh8f_vvgEVurUfA418Zlk1YLReaMz-k_h7A4s69tmGnw/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwh9AIV31WZdYQo-FQFyWjktRhXJr-3-6x7CYE-E1U2qRmUtxqZHBNOG-0U-hni_tJKWA/exec';
 
   // ==================== AUTHENTICATION HANDLERS ====================
   const handleLogin = () => {
