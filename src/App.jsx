@@ -86,7 +86,7 @@ const App = () => {
   const isSubmittingRef = useRef(false);
 
   // ==================== GOOGLE SHEETS URL ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzt6kc-jS-smaos2dGxrrw6fR9iOiWNteX2bv_iJtz5qfYhiSQy3lQ31yOq7987NYUPKg/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzBjsoFZd6XagAMUfKU-IppQRR1W8B-OhYDnboHSmnZXKwiDQv-t57Kbkxsp6TAIxK3lg/exec';
 
   // ==================== AUTHENTICATION HANDLERS ====================
   const handleLogin = () => {
