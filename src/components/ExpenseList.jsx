@@ -35,8 +35,12 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
       }
     }
     
-    // 3. Check if imageUrl exists (Drive URL)
-    if (expense.imageUrl && expense.imageUrl.length > 10) {
+    // ============================================================
+    // 🔥 CRITICAL FIX: Google Drive (imageUrl) ko detect karne ka logic
+    // Pehle length > 10 check kar raha tha, ab hum `startsWith('http')`
+    // use kar rahe hain taake chhota URL bhi accept ho jaye.
+    // ============================================================
+    if (expense.imageUrl && expense.imageUrl.startsWith('http')) {
       return expense.imageUrl;
     }
     
@@ -283,7 +287,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
                         </span>
                       </div>
                       
-                      {/* ============ IMAGE COLUMN (FIXED) ============ */}
+                      {/* ============ IMAGE COLUMN ============ */}
                       <div className="cell-image-v7">
                         {hasImage(expense) ? (
                           <button 
