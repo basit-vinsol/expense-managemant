@@ -35,11 +35,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
       }
     }
     
-    // ============================================================
-    // 🔥 CRITICAL FIX: Google Drive (imageUrl) ko detect karne ka logic
-    // Pehle length > 10 check kar raha tha, ab hum `startsWith('http')`
-    // use kar rahe hain taake chhota URL bhi accept ho jaye.
-    // ============================================================
+    // 3. Check if imageUrl exists (Drive URL)
     if (expense.imageUrl && expense.imageUrl.startsWith('http')) {
       return expense.imageUrl;
     }
@@ -172,12 +168,17 @@ const ExpenseList = ({ expenses, onDelete, onEdit, formatPKR }) => {
   // ============ CHECK IF IMAGE EXISTS ============
   const hasImage = (expense) => {
     if (!expense) return false;
+    // console.log('Checking image for:', expense.description, expense.imageUrl);
     return !!(expense.imageBase64 || expense.imagePath || expense.imageUrl);
   };
 
   const getImageData = (expense) => {
     if (!expense) return null;
-    return getImageSrc(expense);
+    const src = getImageSrc(expense);
+    if (!src) {
+      console.log('⚠️ No valid image found for:', expense.description);
+    }
+    return src;
   };
 
   const formatDate = (dateString) => {
