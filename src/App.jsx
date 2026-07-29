@@ -64,7 +64,7 @@ const App = () => {
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
   const [isSyncing, setIsSyncing] = useState(false);
-  
+
   // ==================== ADMIN PANEL STATE ====================
   const [adminView, setAdminView] = useState('dashboard');
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -72,7 +72,7 @@ const App = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  
+
   const [systemMetrics, setSystemMetrics] = useState({
     activeUsers: 1,
     totalTransactions: 0,
@@ -86,7 +86,7 @@ const App = () => {
   const isSubmittingRef = useRef(false);
 
   // ==================== GOOGLE SHEETS URL ====================
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzBjsoFZd6XagAMUfKU-IppQRR1W8B-OhYDnboHSmnZXKwiDQv-t57Kbkxsp6TAIxK3lg/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbw74ADR_nimOPJnvHSes8Plv17m0OPEhyygs5yhmSB5j2C8zWMrmRBWbftcWJMp8KDxkQ/exec';
 
   // ==================== AUTHENTICATION HANDLERS ====================
   const handleLogin = () => {
@@ -169,25 +169,25 @@ const App = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          
+
           const maxWidth = 800;
           if (width > maxWidth) {
             height = (height * maxWidth) / width;
             width = maxWidth;
           }
-          
+
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
-          
+
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
-          
+
           const filename = `receipt_${Date.now()}.jpg`;
           const path = `/images/${filename}`;
-          
+
           const savedImages = JSON.parse(localStorage.getItem('savedImages') || '[]');
           savedImages.push({
             filename: filename,
@@ -196,10 +196,10 @@ const App = () => {
             timestamp: Date.now()
           });
           localStorage.setItem('savedImages', JSON.stringify(savedImages));
-          
+
           console.log('📸 Image saved locally:', path);
           console.log('📸 Size:', (compressedBase64.length / 1024).toFixed(2), 'KB');
-          
+
           resolve({
             path: path,
             filename: filename,
@@ -250,23 +250,23 @@ const App = () => {
     try {
       const expensesData = JSON.parse(localStorage.getItem('expenses') || '[]');
       const fundHistoryData = JSON.parse(localStorage.getItem('fundHistory') || '[]');
-      
+
       const cleanedExpenses = expensesData.map(item => {
         const { imageBase64, imageUrl, ...rest } = item;
         return rest;
       });
-      
+
       const cleanedFundHistory = fundHistoryData.map(item => {
         const { imageBase64, imageUrl, ...rest } = item;
         return rest;
       });
-      
+
       localStorage.setItem('expenses', JSON.stringify(cleanedExpenses));
       localStorage.setItem('fundHistory', JSON.stringify(cleanedFundHistory));
-      
+
       setExpenses(cleanedExpenses);
       setFundHistory(cleanedFundHistory);
-      
+
       updateStorageMetrics();
     } catch (e) {
       console.error('Emergency cleanup failed:', e);
@@ -282,7 +282,7 @@ const App = () => {
   // ==================== FETCH FROM GOOGLE SHEETS ====================
   const handleFetchFromSheets = async () => {
     if (isSyncing) return;
-    
+
     const result = await Swal.fire({
       title: '📥 Fetch from Google Sheets?',
       text: 'This will download all data from cloud.',
@@ -302,9 +302,9 @@ const App = () => {
     try {
       const cleanUrl = GAS_URL.trim();
       const response = await fetch(`${cleanUrl}?type=expenses`);
-      
+
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+
       const json = await response.json();
 
       if (!json.success) throw new Error(json.message || 'Failed to fetch');
@@ -321,7 +321,7 @@ const App = () => {
         safeSetItem('expenses', JSON.stringify([]));
         safeSetItem('fundHistory', JSON.stringify([]));
         safeSetItem('totalFunds', '0');
-        
+
         await Swal.fire({
           icon: 'info',
           title: '📭 No Cloud Data',
@@ -367,9 +367,9 @@ const App = () => {
       safeSetItem('fundHistory', JSON.stringify(processedFundHistory));
       setFundHistory(processedFundHistory);
 
-      let totalFundsFromSheet = summary ? Number(summary.totalFundsAdded) || 0 : 
+      let totalFundsFromSheet = summary ? Number(summary.totalFundsAdded) || 0 :
         processedFundHistory.filter(item => item.type === 'credit').reduce((sum, item) => sum + item.amount, 0);
-      
+
       setTotalFunds(totalFundsFromSheet);
       safeSetItem('totalFunds', String(totalFundsFromSheet));
 
@@ -385,7 +385,7 @@ const App = () => {
       });
 
       showNotification(`✅ Data restored from cloud successfully!`, 'success');
-      
+
     } catch (error) {
       console.error('Fetch error:', error);
       await Swal.fire({
@@ -402,12 +402,12 @@ const App = () => {
   // ==================== PUSH TO GOOGLE SHEETS (FULL REPLACE) ====================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
-    
+
     // ✅ Always allow push - even with zero data
     const imageCountInState = expenses.filter(e => e.imagePath || e.imageBase64).length;
     console.log('📸 Images to push:', imageCountInState);
     console.log('📊 Total expenses to push:', expenses.length);
-    
+
     const result = await Swal.fire({
       title: '☁️ Push to Google Sheets?',
       html: `This will <b>replace</b> all data in Google Sheets.<br>
@@ -432,7 +432,7 @@ const App = () => {
 
     try {
       const totals = calculateTotals();
-      
+
       const expensesWithPaths = expenses.map(e => ({
         id: e.id || Date.now(),
         date: e.date || new Date().toISOString().split('T')[0],
@@ -496,7 +496,7 @@ const App = () => {
 
       setLastUpdated(new Date().toLocaleTimeString());
       showNotification(`✅ Data replaced with ${imageCountInState} image paths!`, 'success');
-      
+
     } catch (error) {
       console.error('❌ Push error:', error);
       await Swal.fire({
@@ -519,7 +519,7 @@ const App = () => {
           const savedExpenses = JSON.parse(localStorage.getItem('expenses') || '[]');
           const savedFundHistory = JSON.parse(localStorage.getItem('fundHistory') || '[]');
           const savedTotalFunds = parseFloat(localStorage.getItem('totalFunds') || '0');
-          
+
           setExpenses(savedExpenses);
           setFundHistory(savedFundHistory);
           setTotalFunds(savedTotalFunds);
@@ -681,15 +681,15 @@ const App = () => {
         setTotalFunds(0);
         setFundHistory([]);
         setExpenses([]);
-        
+
         localStorage.removeItem('totalFunds');
         localStorage.removeItem('fundHistory');
         localStorage.removeItem('expenses');
-        
+
         setShowPasswordModal(false);
         setPasswordInput('');
         updateStorageMetrics();
-        
+
         await Swal.fire({
           icon: 'success',
           title: '✅ UI Data Cleared!',
@@ -698,7 +698,7 @@ const App = () => {
         });
 
         showNotification('🧹 UI data cleared! Sheet data is safe.', 'success');
-        
+
       } catch (error) {
         console.error('Purge error:', error);
         await Swal.fire({
@@ -768,12 +768,12 @@ const App = () => {
 
       let imagePath = null;
       let imageBase64 = null;
-      
+
       if (expenseData.imageFile) {
         try {
           console.log('📸 Processing image:', expenseData.imageFile.name);
           showNotification('📸 Saving image...', 'info');
-          
+
           const result = await saveImageToLocal(expenseData.imageFile);
           imagePath = result.path;
           imageBase64 = result.base64;
@@ -826,7 +826,7 @@ const App = () => {
         imagePath: imagePath,
         imageBase64: imageBase64
       };
-      
+
       setFundHistory(prev => {
         const exists = prev.some(e => e.id === deductionEntry.id);
         if (exists) {
@@ -835,16 +835,16 @@ const App = () => {
         }
         return [deductionEntry, ...prev];
       });
-      
+
       const typeIcons = {
         'regular': '🔄',
         'one-time': '⚡',
         'bill': '📄'
       };
-      
+
       const hasImage = imagePath ? ' 📸' : '';
       showNotification(`${typeIcons[expenseType]} ${expenseType} expense: ${formatPKR(amount)}${hasImage}`, 'success');
-      
+
       console.log('✅ Expense added successfully!');
       return true;
 
@@ -961,8 +961,8 @@ const App = () => {
     };
   };
 
-  const displayTotals = (searchTerm || filterCategory !== 'All' || filterMonth !== 'All' || filterStartDate || filterEndDate) 
-    ? calculateFilteredTotals() 
+  const displayTotals = (searchTerm || filterCategory !== 'All' || filterMonth !== 'All' || filterStartDate || filterEndDate)
+    ? calculateFilteredTotals()
     : totals;
 
   // ==================== RENDER LOGIN ====================
@@ -1280,7 +1280,7 @@ const App = () => {
     <div className="app">
       {showPasswordModal && <PasswordModal />}
       <Navbar onPurge={handleClearAll} onLogout={handleLogout} onAttendance={() => setActiveTab(activeTab === 'attendance' ? 'expenses' : 'attendance')} activeTab={activeTab} onHome={() => setActiveTab('expenses')} />
-      
+
       {notification.show && (
         <div className={`notification-v8 ${notification.type}`}>
           <div className="noti-content-v8">
