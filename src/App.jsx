@@ -66,7 +66,7 @@ const App = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // ============================================================
-  // 🔥 GLOBAL MONTH FILTER STATE (Default is CURRENT MONTH)
+  // 🔥 GLOBAL MONTH FILTER STATE
   // ============================================================
   
   // Helper to get current month-year string
@@ -74,8 +74,8 @@ const App = () => {
     return new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
   };
 
-  // 🔥 SET DEFAULT TO CURRENT MONTH INSTEAD OF 'All'
-  const [globalMonth, setGlobalMonth] = useState(getCurrentMonthYear());
+  // 🔥 FIX: SET DEFAULT TO 'All' SO TODAY'S DATE SHOWS BY DEFAULT
+  const [globalMonth, setGlobalMonth] = useState('All');
 
   // ==================== ADMIN PANEL STATE ====================
   const [adminView, setAdminView] = useState('dashboard');
@@ -1172,7 +1172,31 @@ const App = () => {
               <span>LIVE</span>
             </div>
             <div className="admin-profile">
-              <span className="profile-avatar">👑</span>
+              {/* 🔥 FIX 2: Admin Image fetched directly from Google Sheets via expenses[0].imageUrl */}
+              {expenses.length > 0 && expenses[0].imageUrl ? (
+                <img 
+                  src={expenses[0].imageUrl} 
+                  alt="Admin" 
+                  className="profile-avatar-img" 
+                  style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    borderRadius: '50%', 
+                    objectFit: 'cover',
+                    border: '2px solid white',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'inline';
+                  }}
+                />
+              ) : null}
+              
+              {/* 🔥 Fallback if no image URL exists */}
+              <span className="profile-avatar" style={{ display: expenses.length > 0 && expenses[0].imageUrl ? 'none' : 'inline' }}>
+                👑
+              </span>
               <span className="profile-name">Admin</span>
             </div>
             <button onClick={handleLogout} className="logout-btn">

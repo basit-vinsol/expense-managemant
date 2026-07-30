@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './ExpenseForm.css';
 
 const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate }) => {
-  // 🔥 FIX: defaultDate prop use karein. Agar All Months hai toh aaj ki date, warna selected month ki 1st date.
+  // 🔥 Ref for Date Input (to trigger popup programmatically)
+  const dateInputRef = useRef(null);
+
+  // 🔥 FINAL FIX: Returns exactly the defaultDate passed from App.jsx (which is the 1st of the current month)
   const getDefaultDate = () => {
-    if (defaultDate) return defaultDate;
-    return new Date().toLocaleDateString('en-CA');
+    if (!defaultDate) {
+      return new Date().toLocaleDateString('en-CA');
+    }
+    return defaultDate; // ✅ Exact 1st of the month (e.g., "2026-07-01")
   };
 
   const categories = [
@@ -22,7 +27,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    date: getDefaultDate(), // 🔥 Default date ab selected month ki hogi
+    date: getDefaultDate(), // 🔥 Date ab bilkul defaultDate ke hisaab se set hogi
     category: '',
     expenseType: '',
     selectionMode: 'none',
@@ -62,6 +67,15 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 🔥 Function to open calendar popup programmatically
+  const openDatePicker = () => {
+    if (dateInputRef.current && typeof dateInputRef.current.showPicker === 'function') {
+      dateInputRef.current.showPicker(); // Modern browsers support this
+    } else if (dateInputRef.current) {
+      dateInputRef.current.focus(); // Fallback for older browsers
+    }
   };
 
   // ============ IMAGE HANDLING ============
@@ -142,18 +156,17 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
     
     try {
       // 🔥 CRITICAL FIX: Floating point precision error fix
-      // parseFloat karte waqt .toFixed(2) use kar rahe hain taake 100000 -> 100000 hi rahe, 99998 na bane
       const finalAmount = parseFloat(parseFloat(formData.amount).toFixed(2));
 
       const submitData = {
         description: formData.description.trim(),
-        amount: finalAmount, // ✅ Ab exact amount hi save hogi
+        amount: finalAmount, 
         date: formData.date,
         category: formData.category || 'Other',
         expenseType: formData.expenseType || 'regular',
         notes: formData.notes || '',
-        imageFile: formData.imageFile,     // ← ACTUAL FILE
-        imagePreview: formData.imagePreview // ← PREVIEW URL
+        imageFile: formData.imageFile,     
+        imagePreview: formData.imagePreview
       };
 
       console.log('📤 Submitting data to parent:', {
@@ -176,7 +189,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
         setFormData({
           description: '',
           amount: '',
-          date: getDefaultDate(), // 🔥 Reset using the same selected month
+          date: getDefaultDate(), // 🔥 Reset using the selected month 1st date
           category: '',
           expenseType: '',
           selectionMode: 'none',
@@ -380,19 +393,31 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
           </>
         )}
 
+        {/* ============================================================ */}
+        {/* 🔥 UPDATED: DATE INPUT WITH CLICK-TO-OPEN CALENDAR */}
+        {/* ============================================================ */}
         <div className="form-group-v5">
           <label>Date</label>
-          <div className="input-wrapper">
-            <span className="input-icon">📅</span>
+          <div className="input-wrapper" style={{ cursor: 'pointer' }}>
+            <span 
+              className="input-icon" 
+              onClick={openDatePicker}
+              style={{ cursor: 'pointer' }}
+            >📅</span>
             <input
+              ref={dateInputRef}
               type="date"
               name="date"
               value={formData.date}
               onChange={handleChange}
               required
+              style={{ cursor: 'pointer' }}
+              // Click on the input field itself also opens the calendar
+              onClick={openDatePicker}
             />
           </div>
         </div>
+        {/* ============================================================ */}
       </div>
 
       <button 
