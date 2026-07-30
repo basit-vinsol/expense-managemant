@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import Summary from './components/Summary';
 import ExpenseForm from './components/ExpenseForm';
@@ -64,6 +64,18 @@ const App = () => {
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // ============================================================
+  // 🔥 GLOBAL MONTH FILTER STATE (Default is CURRENT MONTH)
+  // ============================================================
+  
+  // Helper to get current month-year string
+  const getCurrentMonthYear = () => {
+    return new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
+  // 🔥 SET DEFAULT TO CURRENT MONTH INSTEAD OF 'All'
+  const [globalMonth, setGlobalMonth] = useState(getCurrentMonthYear());
 
   // ==================== ADMIN PANEL STATE ====================
   const [adminView, setAdminView] = useState('dashboard');
@@ -185,7 +197,7 @@ const App = () => {
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
 
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
 
           const filename = `receipt_${Date.now()}.jpg`;
           const path = `/images/${filename}`;
@@ -402,7 +414,7 @@ const App = () => {
   };
 
   // ============================================================
-  // 🔥 FINAL FIX: PUSH TO GOOGLE SHEETS (With 'no-cors' mode)
+  // PUSH TO GOOGLE SHEETS
   // ============================================================
   const handleSyncToSheets = async () => {
     if (isSyncing) return;
@@ -479,16 +491,12 @@ const App = () => {
         lastUpdated: new Date().toISOString()
       };
 
-      // 🔥 CRITICAL FIX: Google /exec URLs ONLY accept 'no-cors' mode
       const cleanUrl = GAS_URL.trim();
       console.log('📤 Sending to URL:', cleanUrl);
 
-      // NOTE: 'no-cors' mode prevents CORS Preflight error, 
-      // BUT we cannot read response.json() in this mode. 
-      // We will just assume success if the request doesn't crash.
       await fetch(cleanUrl, {
         method: 'POST',
-        mode: 'no-cors', // 🔥 Must be here for /exec
+        mode: 'no-cors',
         cache: 'no-cache',
         headers: { 
           'Content-Type': 'application/json'
@@ -496,7 +504,6 @@ const App = () => {
         body: JSON.stringify(dataToSync),
       });
 
-      // ✅ If we reach here, request was sent successfully
       await Swal.fire({
         icon: 'success',
         title: '✅ Push Successful!',
@@ -600,7 +607,21 @@ const App = () => {
     }, 3000);
   };
 
-  // ==================== CALCULATE TOTALS ====================
+  // ============================================================
+  // 🔥 RE-ENGINEERED: CALCULATION LOGIC
+  // ============================================================
+
+  const getMonthYear = (dateStr) => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return 'Invalid Date';
+      return d.toLocaleString('default', { month: 'long', year: 'numeric' });
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  };
+
+  // 1. RAW TOTALS (Used for PUSH and PURGE - Unfiltered)
   const calculateTotals = () => {
     const totalFundsAdded = fundHistory
       .filter(item => item.type === 'credit')
@@ -655,7 +676,82 @@ const App = () => {
     };
   };
 
-  const totals = calculateTotals();
+  const rawTotals = calculateTotals();
+
+  // 🔥 2. FILTERED DATA COMPUTATIONS
+  const filteredExpenses = useMemo(() => {
+    if (globalMonth === 'All') {
+      return expenses;
+    }
+    return expenses.filter(expense => {
+      if (!expense.date) return false;
+      return getMonthYear(expense.date) === globalMonth;
+    });
+  }, [expenses, globalMonth]);
+
+  const filteredFundHistory = useMemo(() => {
+    if (globalMonth === 'All') {
+      return fundHistory;
+    }
+    return fundHistory.filter(item => {
+      if (!item.date) return false;
+      return getMonthYear(item.date) === globalMonth;
+    });
+  }, [fundHistory, globalMonth]);
+
+  const filteredTotals = useMemo(() => {
+    const totalFundsAdded = filteredFundHistory
+      .filter(item => item.type === 'credit')
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    const totalExpenses = filteredExpenses
+      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    const currentBalance = totalFundsAdded - totalExpenses;
+
+    const regularExpensesTotal = filteredExpenses
+      .filter(expense => expense.expenseType === 'regular')
+      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    const oneTimeExpensesTotal = filteredExpenses
+      .filter(expense => expense.expenseType === 'one-time')
+      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    const billsTotal = filteredExpenses
+      .filter(expense => expense.expenseType === 'bill')
+      .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+    const monthlyExpenses = {};
+    const categoryTotals = {};
+
+    filteredExpenses.forEach(expense => {
+      if (expense.date) {
+        const date = new Date(expense.date);
+        const month = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+        monthlyExpenses[month] = (monthlyExpenses[month] || 0) + (expense.amount || 0);
+      }
+      if (expense.category) {
+        categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + (expense.amount || 0);
+      }
+    });
+
+    const usedPercentage = totalFundsAdded > 0 ? (totalExpenses / totalFundsAdded) * 100 : 0;
+    const remainingPercentage = totalFundsAdded > 0 ? (currentBalance / totalFundsAdded) * 100 : 0;
+
+    return {
+      totalFundsAdded,
+      totalExpenses,
+      currentBalance,
+      monthlyExpenses,
+      categoryTotals,
+      usedPercentage: Math.min(usedPercentage, 100).toFixed(1),
+      remainingPercentage: Math.max(remainingPercentage, 0).toFixed(1),
+      totalTransactions: filteredFundHistory.length,
+      regularExpensesTotal,
+      oneTimeExpensesTotal,
+      billsTotal
+    };
+  }, [filteredExpenses, filteredFundHistory]);
 
   // ==================== CORE FUNCTIONS ====================
   const handleClearAll = () => {
@@ -729,7 +825,9 @@ const App = () => {
     setPasswordError('');
   };
 
-  // ==================== ADD FUNDS ====================
+  // ============================================================
+  // 🔥 UPDATED: ADD FUNDS (EXACT MONTH FIX)
+  // ============================================================
   const handleAddFunds = (fundData) => {
     const amount = typeof fundData === 'object' ? parseFloat(fundData.amount) : parseFloat(fundData);
     let description = typeof fundData === 'object' ? fundData.description : 'Funds Added';
@@ -739,12 +837,20 @@ const App = () => {
     }
 
     if (amount > 0) {
+      let transactionDate = new Date().toISOString(); 
+      
+      if (fundData.date) {
+        transactionDate = new Date(fundData.date).toISOString();
+      } else if (globalMonth !== 'All') {
+        transactionDate = new Date(globalMonth).toISOString();
+      }
+
       const newFundEntry = {
         id: Date.now(),
         amount: amount,
         description: description,
-        date: new Date().toISOString(),
-        runningTotal: totals.totalFundsAdded + amount,
+        date: transactionDate,
+        runningTotal: rawTotals.totalFundsAdded + amount,
         type: 'credit',
         imagePath: null,
         imageBase64: null
@@ -756,7 +862,9 @@ const App = () => {
     }
   };
 
-  // ==================== ADD EXPENSE WITH IMAGE ====================
+  // ============================================================
+  // 🔥 UPDATED: ADD EXPENSE (AUDIT TRAIL DATE FIX)
+  // ============================================================
   const handleAddExpense = async (expenseData) => {
     if (isSubmittingRef.current) {
       console.warn('⚠️ Submission already in progress');
@@ -795,11 +903,19 @@ const App = () => {
         }
       }
 
+      let transactionDate = new Date().toISOString().split('T')[0]; 
+      
+      if (expenseData.date) {
+        transactionDate = new Date(expenseData.date).toISOString().split('T')[0];
+      } else if (globalMonth !== 'All') {
+        transactionDate = new Date(globalMonth).toISOString().split('T')[0];
+      }
+
       const newExpense = {
         id: Date.now(),
         description: expenseData.description || 'No description',
         amount: amount,
-        date: expenseData.date || new Date().toISOString().split('T')[0],
+        date: transactionDate,
         category: expenseData.category || 'Other',
         expenseType: expenseType,
         timestamp: Date.now(),
@@ -823,12 +939,14 @@ const App = () => {
         return [newExpense, ...prev];
       });
 
-      const newRunningTotal = totals.currentBalance - amount;
+      const newRunningTotal = rawTotals.currentBalance - amount;
+      
+      // 🔥 CRITICAL FIX: Use same transactionDate for Audit Trail
       const deductionEntry = {
         id: Date.now() + 1,
         amount: -amount,
         description: `${expenseType.toUpperCase()}: ${expenseData.description || 'No description'}`,
-        date: new Date().toISOString(),
+        date: transactionDate, // ✅ Used the same date as the expense
         runningTotal: newRunningTotal,
         type: 'debit',
         category: expenseData.category || 'Other',
@@ -904,9 +1022,9 @@ const App = () => {
 
   // ==================== FILTER FUNCTIONS ====================
   const getFilteredExpenses = () => {
-    if (!Array.isArray(expenses)) return [];
+    if (!Array.isArray(filteredExpenses)) return [];
 
-    let filtered = [...expenses];
+    let filtered = [...filteredExpenses];
 
     if (searchTerm && searchTerm.trim()) {
       filtered = filtered.filter(e =>
@@ -952,18 +1070,18 @@ const App = () => {
     return filtered;
   };
 
-  const filteredExpenses = getFilteredExpenses() || [];
+  const localFilteredExpenses = getFilteredExpenses() || [];
 
   const calculateFilteredTotals = () => {
-    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalExpenses = localFilteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
     const categoryTotals = {};
-    filteredExpenses.forEach(e => {
+    localFilteredExpenses.forEach(e => {
       categoryTotals[e.category] = (categoryTotals[e.category] || 0) + (e.amount || 0);
     });
-    const usedPercentage = totals.totalFundsAdded > 0 ? (totalExpenses / totals.totalFundsAdded) * 100 : 0;
+    const usedPercentage = filteredTotals.totalFundsAdded > 0 ? (totalExpenses / filteredTotals.totalFundsAdded) * 100 : 0;
 
     return {
-      ...totals,
+      ...filteredTotals,
       totalExpenses,
       categoryTotals,
       usedPercentage: Math.min(usedPercentage, 100).toFixed(1),
@@ -973,7 +1091,7 @@ const App = () => {
 
   const displayTotals = (searchTerm || filterCategory !== 'All' || filterMonth !== 'All' || filterStartDate || filterEndDate)
     ? calculateFilteredTotals()
-    : totals;
+    : filteredTotals;
 
   // ==================== RENDER LOGIN ====================
   if (!isAuthenticated) {
@@ -1088,22 +1206,22 @@ const App = () => {
               <div className="card-icon">💰</div>
               <div className="card-content">
                 <span className="card-label">Total Funds</span>
-                <span className="card-value">{formatPKR(totals.totalFundsAdded)}</span>
+                <span className="card-value">{formatPKR(filteredTotals.totalFundsAdded)}</span>
               </div>
             </div>
             <div className="kpi-card purple">
               <div className="card-icon">💸</div>
               <div className="card-content">
                 <span className="card-label">Total Expenses</span>
-                <span className="card-value">{formatPKR(totals.totalExpenses)}</span>
+                <span className="card-value">{formatPKR(filteredTotals.totalExpenses)}</span>
               </div>
             </div>
             <div className="kpi-card green">
               <div className="card-icon">⚖️</div>
               <div className="card-content">
                 <span className="card-label">Balance</span>
-                <span className={`card-value ${totals.currentBalance < 0 ? 'negative' : ''}`}>
-                  {formatPKR(totals.currentBalance)}
+                <span className={`card-value ${filteredTotals.currentBalance < 0 ? 'negative' : ''}`}>
+                  {formatPKR(filteredTotals.currentBalance)}
                 </span>
               </div>
             </div>
@@ -1111,9 +1229,9 @@ const App = () => {
               <div className="card-icon">📊</div>
               <div className="card-content">
                 <span className="card-label">Usage</span>
-                <span className="card-value">{totals.usedPercentage}%</span>
+                <span className="card-value">{filteredTotals.usedPercentage}%</span>
                 <div className="progress-mini">
-                  <div className="progress-fill" style={{ width: `${Math.min(totals.usedPercentage, 100)}%` }}></div>
+                  <div className="progress-fill" style={{ width: `${Math.min(filteredTotals.usedPercentage, 100)}%` }}></div>
                 </div>
               </div>
             </div>
@@ -1141,11 +1259,11 @@ const App = () => {
                 <div className="category-breakdown">
                   <h3>Category Distribution</h3>
                   <div className="category-bars">
-                    {Object.entries(totals.categoryTotals).map(([category, amount]) => (
+                    {Object.entries(filteredTotals.categoryTotals).map(([category, amount]) => (
                       <div key={category} className="category-bar-item">
                         <span className="cat-name">{category}</span>
                         <div className="bar-container">
-                          <div className="bar-fill" style={{ width: `${(amount / totals.totalExpenses) * 100}%` }}></div>
+                          <div className="bar-fill" style={{ width: `${(amount / filteredTotals.totalExpenses) * 100}%` }}></div>
                         </div>
                         <span className="cat-amount">{formatPKR(amount)}</span>
                       </div>
@@ -1157,13 +1275,20 @@ const App = () => {
 
             {adminView === 'analytics' && (
               <div className="analytics-panel">
-                <MonthlyOverview monthlyExpenses={totals.monthlyExpenses} categoryTotals={totals.categoryTotals} formatPKR={formatPKR} />
+                <MonthlyOverview monthlyExpenses={filteredTotals.monthlyExpenses} categoryTotals={filteredTotals.categoryTotals} formatPKR={formatPKR} />
               </div>
             )}
 
             {adminView === 'reports' && (
               <div className="reports-panel">
-                <PrintReport expenses={expenses} fundHistory={fundHistory} totals={totals} formatPKR={formatPKR} lastUpdated={lastUpdated} filteredExpenses={filteredExpenses} />
+                <PrintReport 
+                  expenses={localFilteredExpenses} 
+                  fundHistory={filteredFundHistory} 
+                  totals={filteredTotals} 
+                  formatPKR={formatPKR} 
+                  lastUpdated={lastUpdated} 
+                  filteredExpenses={localFilteredExpenses} 
+                />
               </div>
             )}
 
@@ -1178,7 +1303,7 @@ const App = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {fundHistory.map(item => (
+                      {filteredFundHistory.map(item => (
                         <tr key={item.id}>
                           <td>{new Date(item.date).toLocaleString()}</td>
                           <td><span className={`badge ${item.type}`}>{item.type === 'credit' ? 'CREDIT' : 'DEBIT'}</span></td>
@@ -1304,34 +1429,83 @@ const App = () => {
       <main className="main-content">
         {activeTab === 'attendance' ? <Attendance /> : (
           <div className="dashboard-v11">
+            
+            {/* ============================================================ */}
+            {/* 🔥 GLOBAL MONTH FILTER UI (Defaults to Current Month) */}
+            {/* ============================================================ */}
+            <section className="grid-full-v11 glass-card summary-section-v11" style={{ padding: '15px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500', color: '#64748b' }}>
+                <span>📅 Filter by Month:</span>
+                <select 
+                  value={globalMonth} 
+                  onChange={(e) => setGlobalMonth(e.target.value)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: 'white',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    color: '#1e293b'
+                  }}
+                >
+                  <option value="All">📊 All Months</option>
+                  {Array.from(new Set([...expenses.map(e => e.date ? getMonthYear(e.date) : ''), ...fundHistory.map(f => f.date ? getMonthYear(f.date) : '')]))
+                    .filter(m => m !== 'Invalid Date' && m !== '')
+                    .sort((a, b) => new Date(a) - new Date(b))
+                    .map(month => (
+                      <option key={month} value={month}>{month}</option>
+                    ))}
+                </select>
+              </div>
+              <div style={{ fontSize: '14px', color: '#94a3b8' }}>
+                {globalMonth === 'All' ? 'Showing all records' : `Showing records for ${globalMonth}`}
+              </div>
+            </section>
+            {/* ============================================================ */}
+
             <section className="grid-full-v11 glass-card summary-section-v11">
-              <Summary totals={displayTotals} formatPKR={formatPKR} lastUpdated={lastUpdated} isFiltered={displayTotals !== totals} />
+              <Summary totals={displayTotals} formatPKR={formatPKR} lastUpdated={lastUpdated} isFiltered={displayTotals !== filteredTotals || globalMonth !== 'All'} />
             </section>
 
+            {/* 🔥 ExpenseForm with defaultDate passed */}
             <section className="grid-half-v11 glass-card">
               <div className="section-header-v10"><h3><span>💰</span> Add Funds</h3></div>
-              <ExpenseForm type="funds" onSubmit={handleAddFunds} formatPKR={formatPKR} currentBalance={totals.currentBalance} />
+              <ExpenseForm 
+                type="funds" 
+                onSubmit={handleAddFunds} 
+                formatPKR={formatPKR} 
+                currentBalance={filteredTotals.currentBalance}
+                defaultDate={globalMonth !== 'All' ? new Date(globalMonth).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]} 
+              />
             </section>
 
             <section className="grid-half-v11 glass-card">
               <div className="section-header-v10"><h3><span>💸</span> Add Expense</h3></div>
-              <ExpenseForm type="expense" onSubmit={handleAddExpense} formatPKR={formatPKR} currentBalance={totals.currentBalance} />
+              <ExpenseForm 
+                type="expense" 
+                onSubmit={handleAddExpense} 
+                formatPKR={formatPKR} 
+                currentBalance={filteredTotals.currentBalance}
+                defaultDate={globalMonth !== 'All' ? new Date(globalMonth).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]} 
+              />
             </section>
 
             <section className="grid-full-v11 glass-card history-section-v11">
               <div className="section-header-v10">
-                <div className="title-group-v11"><h3><span>📜</span> Expenses</h3><span className="count-badge-v11">{filteredExpenses.length}</span></div>
+                <div className="title-group-v11"><h3><span>📜</span> Expenses</h3><span className="count-badge-v11">{localFilteredExpenses.length}</span></div>
                 <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
               </div>
-              <Filters filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterMonth={filterMonth} setFilterMonth={setFilterMonth} filterStartDate={filterStartDate} setFilterStartDate={setFilterStartDate} filterEndDate={filterEndDate} setFilterEndDate={setFilterEndDate} sortBy={sortBy} setSortBy={setSortBy} expenses={expenses} />
+              <Filters filterCategory={filterCategory} setFilterCategory={setFilterCategory} filterMonth={filterMonth} setFilterMonth={setFilterMonth} filterStartDate={filterStartDate} setFilterStartDate={setFilterStartDate} filterEndDate={filterEndDate} setFilterEndDate={setFilterEndDate} sortBy={sortBy} setSortBy={setSortBy} expenses={filteredExpenses} />
               <div className="scrollable-data-v11">
-                <ExpenseList expenses={filteredExpenses} onDelete={handleDeleteExpense} onEdit={handleEditExpense} formatPKR={formatPKR} />
+                <ExpenseList expenses={localFilteredExpenses} onDelete={handleDeleteExpense} onEdit={handleEditExpense} formatPKR={formatPKR} />
               </div>
             </section>
 
             <section className="grid-sidebar-v11 glass-card">
               <div className="section-header-v10"><h3><span>📊</span> Analytics</h3></div>
-              <MonthlyOverview monthlyExpenses={totals.monthlyExpenses} categoryTotals={totals.categoryTotals} formatPKR={formatPKR} />
+              <MonthlyOverview monthlyExpenses={filteredTotals.monthlyExpenses} categoryTotals={filteredTotals.categoryTotals} formatPKR={formatPKR} />
             </section>
 
             <section className="grid-full-v11">
@@ -1368,14 +1542,21 @@ const App = () => {
                     </div>
                     <div className="control-card-v13">
                       <h4>Report Generation</h4>
-                      <PrintReport expenses={expenses} fundHistory={fundHistory} totals={totals} formatPKR={formatPKR} lastUpdated={lastUpdated} filteredExpenses={filteredExpenses} />
+                      <PrintReport 
+                        expenses={localFilteredExpenses} 
+                        fundHistory={filteredFundHistory} 
+                        totals={filteredTotals} 
+                        formatPKR={formatPKR} 
+                        lastUpdated={lastUpdated} 
+                        filteredExpenses={localFilteredExpenses} 
+                      />
                     </div>
                   </div>
 
                   <div className="console-timeline-v13">
                     <div className="timeline-header-v13"><h4>Audit Timeline</h4></div>
                     <div className="scrollable-audit-v13">
-                      <FundHistory history={fundHistory} formatPKR={formatPKR} onDelete={handleDeleteTransaction} />
+                      <FundHistory history={filteredFundHistory} formatPKR={formatPKR} onDelete={handleDeleteTransaction} />
                     </div>
                   </div>
                 </div>

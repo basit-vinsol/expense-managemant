@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import './ExpenseForm.css';
 
-const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
-  const getTodayDate = () => new Date().toLocaleDateString('en-CA');
+const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate }) => {
+  // 🔥 UPDATED: Use defaultDate prop from App.jsx (which respects Global Month)
+  const getTodayDate = () => {
+    if (defaultDate) return defaultDate;
+    return new Date().toLocaleDateString('en-CA');
+  };
 
   const categories = [
     'One-time Expense', 'Regular Expense', 'Office Stationery', 'Employee Stuff', 
@@ -18,7 +22,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    date: getTodayDate(),
+    date: getTodayDate(), // 🔥 Automatically sets to the passed defaultDate
     category: '',
     expenseType: '',
     selectionMode: 'none',
@@ -160,7 +164,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance }) => {
         setFormData({
           description: '',
           amount: '',
-          date: getTodayDate(),
+          date: getTodayDate(), // 🔥 Reset using the same global date logic
           category: '',
           expenseType: '',
           selectionMode: 'none',
