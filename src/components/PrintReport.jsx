@@ -74,6 +74,18 @@ const PrintReport = ({ expenses, fundHistory, totals, formatPKR, lastUpdated, fi
       });
     };
 
+    // ============================================================
+    // 🔥 CRITICAL FIX: Calculate Running Balance based on filtered history
+    // ============================================================
+    let runningTotal = 0;
+    const filteredHistoryWithBalance = filteredHist.map((item) => {
+      runningTotal += (item.type === 'credit' ? item.amount : -Math.abs(item.amount));
+      return {
+        ...item,
+        runningTotal: runningTotal
+      };
+    });
+
     const reportHTML = `
       <!DOCTYPE html>
       <html>
@@ -185,7 +197,7 @@ const PrintReport = ({ expenses, fundHistory, totals, formatPKR, lastUpdated, fi
                 </tr>
               </thead>
               <tbody>
-                ${filteredHist.map(item => `
+                ${filteredHistoryWithBalance.map(item => `
                   <tr>
                     <td>${formatDate(item.date)}</td>
                     <td>${item.description}</td>

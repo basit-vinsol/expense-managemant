@@ -1,13 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import './FundHistory.css';
 
 const FundHistory = ({ history, formatPKR, onDelete }) => {
   const [filter, setFilter] = useState('all');
 
-  const filteredHistory = history.filter(item => {
-    if (filter === 'all') return true;
-    return item.type === filter;
-  });
+  // 🔥 STEP 1: Pehle Filtered History ko calculate karein
+  const filteredHistory = useMemo(() => {
+    if (filter === 'all') return history;
+    return history.filter(item => item.type === filter);
+  }, [history, filter]);
+
+  // 🔥 STEP 2: Filtered History ke hisaab se Running Balance calculate karein
+  const historyWithBalance = useMemo(() => {
+    let runningTotal = 0;
+    return filteredHistory.map((item) => {
+      // Agar credit hai toh add, debit hai toh subtract
+      runningTotal += (item.type === 'credit' ? item.amount : -Math.abs(item.amount));
+      return {
+        ...item,
+        runningTotal: runningTotal // ✅ Naya Running Total (Sirf filtered data ka)
+      };
+    });
+  }, [filteredHistory]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -45,12 +59,12 @@ const FundHistory = ({ history, formatPKR, onDelete }) => {
       </div>
 
       <div className="timeline-container-v13">
-        {filteredHistory.length === 0 ? (
+        {historyWithBalance.length === 0 ? (
           <div className="empty-v13">
             <p>No transaction records found</p>
           </div>
         ) : (
-          filteredHistory.map((item, index) => (
+          historyWithBalance.map((item, index) => (
             <div key={item.id || index} className={`log-entry-v13 ${item.type}`}>
               <div className="log-marker-v13">
                 <span className="marker-dot-v13">

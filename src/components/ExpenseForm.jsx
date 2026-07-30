@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './ExpenseForm.css';
 
 const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate }) => {
-  // 🔥 UPDATED: Use defaultDate prop from App.jsx (which respects Global Month)
-  const getTodayDate = () => {
+  // 🔥 FIX: defaultDate prop use karein. Agar All Months hai toh aaj ki date, warna selected month ki 1st date.
+  const getDefaultDate = () => {
     if (defaultDate) return defaultDate;
     return new Date().toLocaleDateString('en-CA');
   };
@@ -22,7 +22,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
-    date: getTodayDate(), // 🔥 Automatically sets to the passed defaultDate
+    date: getDefaultDate(), // 🔥 Default date ab selected month ki hogi
     category: '',
     expenseType: '',
     selectionMode: 'none',
@@ -30,6 +30,14 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
     imageFile: null,
     imagePreview: null
   });
+
+  // 🔥 Agar defaultDate change ho (Global filter change), toh form date update ho
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      date: getDefaultDate()
+    }));
+  }, [defaultDate]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -133,9 +141,13 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
     setIsSubmitting(true);
     
     try {
+      // 🔥 CRITICAL FIX: Floating point precision error fix
+      // parseFloat karte waqt .toFixed(2) use kar rahe hain taake 100000 -> 100000 hi rahe, 99998 na bane
+      const finalAmount = parseFloat(parseFloat(formData.amount).toFixed(2));
+
       const submitData = {
         description: formData.description.trim(),
-        amount: parseFloat(formData.amount),
+        amount: finalAmount, // ✅ Ab exact amount hi save hogi
         date: formData.date,
         category: formData.category || 'Other',
         expenseType: formData.expenseType || 'regular',
@@ -164,7 +176,7 @@ const ExpenseForm = ({ type, onSubmit, formatPKR, currentBalance, defaultDate })
         setFormData({
           description: '',
           amount: '',
-          date: getTodayDate(), // 🔥 Reset using the same global date logic
+          date: getDefaultDate(), // 🔥 Reset using the same selected month
           category: '',
           expenseType: '',
           selectionMode: 'none',
